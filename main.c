@@ -6,73 +6,156 @@
 #include "mpc/mpc.h"
 
 
-int fevalop(double* a, char* op, double b) {
-    if (strcmp(op, "+") == 0) { *a += b; return 0; }
-    if (strcmp(op, "-") == 0) { *a -= b; return 0; }
-    if (strcmp(op, "*") == 0) { *a *= b; return 0; }
-    if (strcmp(op, "/") == 0) { *a /= b; return 0; }
-    return 1;
+// Evaluation result type. l is for lis.
+// I - Integer
+// F - Float
+// E - Error
+enum ltype{I, F, E};
+
+// Error type
+enum etype {
+    ERR_DIV_ZERO,
+    ERR_BAD_OP,
+    ERR_BAD_NUM,
+    ERR_UNK,
+    ERR_NO_ERR,
+};
+
+typedef struct {
+    enum ltype type;
+    union {
+        long int in;
+        double fn;
+        enum etype err;
+    } v;
+} lval;
+
+lval new_lval(enum ltype type) {
+    lval v;
+    v.type = type;
+    switch (type) {
+        case I: v.v.in=0; break;
+        case F: v.v.fn=0.; break;
+        case E: v.v.err=ERR_NO_ERR; break;
+    };
+
+    return v;
 }
 
 
-long ievalop(long int* a, char* op, long int b) {
-    if (strcmp(op, "+") == 0) { *a += b; return 0; }
-    if (strcmp(op, "-") == 0) { *a -= b; return 0; }
-    if (strcmp(op, "*") == 0) { *a *= b; return 0; }
-    if (strcmp(op, "/") == 0) { *a /= b; return 0; }
-    return 1;
+void lval_print(lval v) {
+    switch (v.type) {
+        case I: printf("%li", v.v.in); break;
+        case F: printf("%lf", v.v.fn); break;
+        case E:
+            if (v.v.err == ERR_DIV_ZERO) { printf("Error: Division By Zero."); }
+            if (v.v.err == ERR_BAD_OP)   { printf("Error: Invalid Operator."); }
+            if (v.v.err == ERR_BAD_NUM)  { printf("Error: Invalid Number."); }
+            if (v.v.err == ERR_UNK)  { printf("Error: Unknown Error."); }
+            if (v.v.err == ERR_NO_ERR)   { printf("Error: Error not set,\
+                    possibly everything is ok."); }
+            break;
+    }
 }
 
-int eval(mpc_ast_t* t, long int* in, double* fn, int fpa, char* op) {
-    // Floating point arithmetic?
-    // Buffer integer
-    long int bin = 0;
-    // Buffer float
-    double bfn = 0.;
+
+void lval_println(lval v) { lval_print(v); putchar('\n'); }
+
+
+lval evalop(lval a, char* op, lval b) {
+    if (a.type == E) { return a; }
+    if (b.type == E) { return b; }
+
+    // Integer op Integer
+    if (a.type == I) {
+        if (b.type == I) {
+            if (strcmp(op, "+") == 0) { a.v.in += b.v.in; return a; }
+            if (strcmp(op, "-") == 0) { a.v.in -= b.v.in; return a; }
+            if (strcmp(op, "*") == 0) { a.v.in *= b.v.in; return a; }
+            if (strcmp(op, "/") == 0) {
+                if (b.v.in == 0) { a.type = E; a.v.err = ERR_DIV_ZERO; return a; }
+                else             { a.v.in /= b.v.in; return a; }
+            }
+            a.type = E;
+            a.v.err = ERR_BAD_OP;
+            return a;
+
+    // Integer op Float
+        } else if (b.type == F) {
+            a.type = F;
+            a.v.fn = a.v.in;
+            if (strcmp(op, "+") == 0) { a.v.fn += b.v.fn; return a; }
+            if (strcmp(op, "-") == 0) { a.v.fn -= b.v.fn; return a; }
+            if (strcmp(op, "*") == 0) { a.v.fn *= b.v.fn; return a; }
+            if (strcmp(op, "/") == 0) {
+                if (b.v.in == 0) { a.type = E; a.v.err = ERR_DIV_ZERO; return a; }
+                else             { a.v.fn /= b.v.fn; return a; }
+            }
+            a.type = E;
+            a.v.err = ERR_BAD_OP;
+            return a;
+        }
+    // Float op Integer
+    } else if (a.type == F) {
+        if (b.type == I) {
+            b.type = F;
+            b.v.fn = b.v.in;
+            if (strcmp(op, "+") == 0) { a.v.fn += b.v.fn; return a; }
+            if (strcmp(op, "-") == 0) { a.v.fn -= b.v.fn; return a; }
+            if (strcmp(op, "*") == 0) { a.v.fn *= b.v.fn; return a; }
+            if (strcmp(op, "/") == 0) {
+                if (b.v.in == 0) { a.type = E; a.v.err = ERR_DIV_ZERO; return a; }
+                else             { a.v.fn /= b.v.fn; return a; }
+            }
+            a.type = E;
+            a.v.err = ERR_BAD_OP;
+            return a;
+    // Float op Float
+        } else if (b.type == F) {
+            if (strcmp(op, "+") == 0) { a.v.fn += b.v.fn; return a; }
+            if (strcmp(op, "-") == 0) { a.v.fn -= b.v.fn; return a; }
+            if (strcmp(op, "*") == 0) { a.v.fn *= b.v.fn; return a; }
+            if (strcmp(op, "/") == 0) {
+                if (b.v.in == 0) { a.type = E; a.v.err = ERR_DIV_ZERO; return a; }
+                else             { a.v.fn /= b.v.fn; return a; }
+            }
+            a.type = E;
+            a.v.err = ERR_BAD_OP;
+            return a;
+        }
+    }
+    a.type = E;
+    a.v.err = ERR_BAD_NUM;
+    return a;
+}
+
+
+lval eval(mpc_ast_t* t) {
     if (strstr(t->tag, "number")) {
         if (strstr(t->tag, "decimal")) {
-            fpa = 1;
-            //fevalop(fn, op, bfn);
-            *fn = atof(t->contents);
-            return fpa;
+            errno = 0;
+            lval v = new_lval(F);
+            v.v.fn = strtod(t->contents, NULL);
+            if (errno != ERANGE) { return v; }
+            else { v.type = E; v.v.err = ERR_BAD_NUM; return v; }
         } else if (strstr(t->tag, "integer")) {
-            if (fpa) {
-                *fn = atol(t->contents);
-
-            } else {
-                *in = atol(t->contents);
-            }
-            //ievalop(in, op, bin);
-            return fpa;
-        } else {
-            // shouldn't fall here
-            puts("shouldn't fall here");
+            errno = 0;
+            lval v = new_lval(I);
+            v.v.in = strtol(t->contents, NULL, 10);
+            if (errno != ERANGE) { return v; }
+            else { v.type = E; v.v.err = ERR_BAD_NUM; return v; }
         }
-    } else {
-        op = t->children[1]->contents;
     }
+    char* op = t->children[1]->contents;
 
     // The operator is always (hopefully) second child
-    fpa = eval(t->children[2], in, fn, fpa, op);
+    lval a = eval(t->children[2]);
 
-    for (int i=3; strstr(t->children[i]->tag, "expr"); i++) 
-        // If we work on floating pointer numbers...
-        if (fpa) {
-            fpa = eval(t->children[i], &bin, &bfn, fpa, op);
-            fevalop(fn, op, bfn);
-        // And if we don't...
-        } else {
-            fpa = eval(t->children[i], &bin, &bfn, fpa, op);
-            if (fpa) {
-                // Don't forget to cast second argument to floating poing
-                // if needed
-                *fn = *in;
-                fevalop(fn, op, bfn);
-            } else {
-                ievalop(in, op, bin);
-            }
-        }
-    return fpa;
+    for (int i=3; strstr(t->children[i]->tag, "expr"); i++) {
+        a = evalop(a, op, eval(t->children[i]));
+    }
+
+    return a;
 }
 
 int main(int argc, char** argv) {
@@ -99,7 +182,7 @@ int main(int argc, char** argv) {
 
 
     // Print Version and Exit Information
-    puts("lis v0.2.0");
+    puts("lis v0.3.0");
     puts("Press ^C to Exit\n");
 
     while(1) {
@@ -109,14 +192,7 @@ int main(int argc, char** argv) {
         // Attempt to Parse the use Input
         if (mpc_parse("<stdin>", input, Program, &r)) {
             //mpc_ast_print(r.output);
-            long int ires = 0;
-            double dres = 0;
-            int fpa = eval(r.output, &ires, &dres, 0, "");
-            if (fpa) {
-                printf("< %lf\n", dres);
-            } else {
-                printf("< %li\n", ires);
-            }
+            lval_println(eval(r.output));
             mpc_ast_delete(r.output);
         } else {
             mpc_err_print(r.error);
