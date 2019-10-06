@@ -146,7 +146,6 @@ lval* lval_read(mpc_ast_t* t) {
     lval* v = NULL;
     if (strstr(t->tag, "sexpr")) { v = newSE(); }
     else if (strcmp(t->tag, ">") == 0) {
-        puts("It's strange! We shouldn't fall here... Anyway..." );
         v = newSE();
     }
 
@@ -391,7 +390,6 @@ lval* builtin_op(lval* vs, lval* sym) {
                         }
                         break;
                     case F:
-                        printf("I'm here! 1 ");
                         a->type = F;
                         a->v.fn = a->v.in;
                         switch (sym->v.sym) {
