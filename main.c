@@ -396,7 +396,7 @@ lval* builtin_op(lval* vs, lval* sym) {
                             case PLUS:  a->v.fn += b->v.fn; break;
                             case MINUS: a->v.fn -= b->v.fn; break;
                             case MUL:   a->v.fn *= b->v.fn; break;
-                            case DIV:   a->v.fn /= b->v.fn; break;
+                            case DIV:
                                 if (b->v.fn == 0) {
                                     lval_del(a); lval_del(b); lval_del(sym);
                                     lval_del(vs);
@@ -424,7 +424,7 @@ lval* builtin_op(lval* vs, lval* sym) {
                             case PLUS:  a->v.fn += b->v.fn; break;
                             case MINUS: a->v.fn -= b->v.fn; break;
                             case MUL:   a->v.fn *= b->v.fn; break;
-                            case DIV:   a->v.fn /= b->v.fn; break;
+                            case DIV:
                                 if (b->v.fn == 0) {
                                     lval_del(a); lval_del(b); lval_del(sym);
                                     lval_del(vs);
@@ -439,7 +439,7 @@ lval* builtin_op(lval* vs, lval* sym) {
                             case PLUS:  a->v.fn += b->v.fn; break;
                             case MINUS: a->v.fn -= b->v.fn; break;
                             case MUL:   a->v.fn *= b->v.fn; break;
-                            case DIV:   a->v.fn /= b->v.fn; break;
+                            case DIV:
                                 if (b->v.fn == 0) {
                                     lval_del(a); lval_del(b); lval_del(sym);
                                     lval_del(vs);
@@ -532,7 +532,6 @@ int main(int argc, char** argv) {
     puts("lis v0.4.0");
     puts("Press ^C to Exit\n");
 
-    while(1) {
         mpc_result_t r;
 
         char* input = readline("> ");
@@ -551,7 +550,6 @@ int main(int argc, char** argv) {
 
         add_history(input);
         free (input);
-    }
 
     mpc_cleanup(7, Number, Decimal, Integer, Symbol, Sexpr, Expr, Program);
 
