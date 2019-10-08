@@ -5,6 +5,9 @@
 
 #include "mpc/mpc.h"
 
+#define LASSERT(args, cond, err, errm) \
+    if (!(cond)) { lval_del(args); return newE(err, errm); }
+
 
 // Expression type. l is for lis.
 // I - Integer
@@ -12,7 +15,8 @@
 // E - Error
 // SY - Symbol
 // SE - S-expression
-enum ltype{I, F, E, SY, SE};
+// Q  - Q-expression
+enum ltype{I, F, E, SY, SE, Q};
 
 // Error type
 enum etype {
@@ -22,14 +26,22 @@ enum etype {
     ERR_UNK,
     ERR_NO_ERR,
     ERR_NOT_SEXPR,
+    ERR_NOT_QEXPR,
     ERR_OUT_OF_BOUND,
 };
 
+// Symbol types
 enum stype {
     PLUS,
     MINUS,
     MUL,
     DIV,
+    LIST,
+    HEAD,
+    TAIL,
+    JOIN,
+    EVAL,
+    UNKNSYM,
 };
 
 typedef struct lval {
@@ -73,17 +85,31 @@ lval* newSY(char* s) {
     lval* v = malloc(sizeof(lval));
     v->type = SY;
     v->sym = malloc(strlen(s) + 1);
-    if (strcmp(s, "+") == 0) { v->v.sym = PLUS; }
-    if (strcmp(s, "-") == 0) { v->v.sym = MINUS; }
-    if (strcmp(s, "*") == 0) { v->v.sym = MUL; }
-    if (strcmp(s, "/") == 0) { v->v.sym = DIV; }
     strcpy(v->sym, s);
+    if (strcmp(s, "+") == 0) { v->v.sym = PLUS; }
+    else if (strcmp(s, "-") == 0) { v->v.sym = MINUS; }
+    else if (strcmp(s, "*") == 0) { v->v.sym = MUL; }
+    else if (strcmp(s, "/") == 0) { v->v.sym = DIV; }
+    else if (strcmp(s, "list") == 0) { v->v.sym = LIST; }
+    else if (strcmp(s, "head") == 0) { v->v.sym = HEAD; }
+    else if (strcmp(s, "tail") == 0) { v->v.sym = TAIL; }
+    else if (strcmp(s, "join") == 0) { v->v.sym = JOIN; }
+    else if (strcmp(s, "eval") == 0) { v->v.sym = EVAL; }
+    else { v->v.sym = UNKNSYM; }
     return v;
 }
 
 lval* newSE() {
     lval* v = malloc(sizeof(lval));
     v->type = SE;
+    v->count = 0;
+    v->cell = NULL;
+    return v;
+}
+
+lval* newQ() {
+    lval* v = malloc(sizeof(lval));
+    v->type = Q;
     v->count = 0;
     v->cell = NULL;
     return v;
@@ -98,6 +124,7 @@ void lval_del(lval* v) {
         case SY: free(v->sym); break;
 
         case SE:
+        case Q:
             for (int i = 0; i < v->count; i++) {
                 lval_del(v->cell[i]);
             }
@@ -144,17 +171,17 @@ lval* lval_read(mpc_ast_t* t) {
 
     // New branch
     lval* v = NULL;
-    if (strstr(t->tag, "sexpr")) { v = newSE(); }
-    else if (strcmp(t->tag, ">") == 0) {
-        puts("It's strange! We shouldn't fall here... Anyway..." );
-        v = newSE();
-    }
+    if      (strstr(t->tag, "sexpr"))  { v = newSE(); }
+    else if (strstr(t->tag, "qexpr"))  { v = newQ();  }
+    else if (strcmp(t->tag, ">") == 0) { v = newSE(); }
 
 
     // Fill this new branch with contained expressions
     for (int i = 0; i < t->children_num; i++) {
         if (strcmp(t->children[i]->contents, "(") == 0) { continue; }
         if (strcmp(t->children[i]->contents, ")") == 0) { continue; }
+        if (strcmp(t->children[i]->contents, "{") == 0) { continue; }
+        if (strcmp(t->children[i]->contents, "}") == 0) { continue; }
         if (strcmp(t->children[i]->tag, "regex") == 0) { continue; }
         v = lval_add(v, lval_read(t->children[i]));
     }
@@ -170,6 +197,7 @@ void lval_print(lval* v) {
         case F: printf("%lf", v->v.fn); break;
         case SY: printf("%s", v->sym); break;
         case SE: lval_expr_print(v, '(', ')'); break;
+        case Q:  lval_expr_print(v, '{', '}'); break;
         case E:
             if (strcmp(v->err, "") == 0) {
                 switch (v->v.err) {
@@ -179,6 +207,7 @@ void lval_print(lval* v) {
                     case ERR_UNK:       printf("Error: Unknown Error."); break;
                     case ERR_OUT_OF_BOUND:       printf("Error: Index out of bound."); break;
                     case ERR_NOT_SEXPR:       printf("Error: Not S-expression."); break;
+                    case ERR_NOT_QEXPR:       printf("Error: Not Q-expression."); break;
                     case ERR_NO_ERR:    printf("Error: Error not set,\
                             possibly everything is ok."); break;
                 }
@@ -221,82 +250,11 @@ lval new_lval(enum ltype type) {
 }
 
 
-
-lval evalop(lval a, char* op, lval b) {
-    if (a.type == E) { return a; }
-    if (b.type == E) { return b; }
-
-    // Integer op Integer
-    if (a.type == I) {
-        if (b.type == I) {
-            if (strcmp(op, "+") == 0) { a.v.in += b.v.in; return a; }
-            if (strcmp(op, "-") == 0) { a.v.in -= b.v.in; return a; }
-            if (strcmp(op, "*") == 0) { a.v.in *= b.v.in; return a; }
-            if (strcmp(op, "/") == 0) {
-                if (b.v.in == 0) { a.type = E; a.v.err = ERR_DIV_ZERO; return a; }
-                else             { a.v.in /= b.v.in; return a; }
-            }
-            a.type = E;
-            a.v.err = ERR_BAD_OP;
-            return a;
-
-    // Integer op Float
-        } else if (b.type == F) {
-            a.type = F;
-            a.v.fn = a.v.in;
-            if (strcmp(op, "+") == 0) { a.v.fn += b.v.fn; return a; }
-            if (strcmp(op, "-") == 0) { a.v.fn -= b.v.fn; return a; }
-            if (strcmp(op, "*") == 0) { a.v.fn *= b.v.fn; return a; }
-            if (strcmp(op, "/") == 0) {
-                if (b.v.in == 0) { a.type = E; a.v.err = ERR_DIV_ZERO; return a; }
-                else             { a.v.fn /= b.v.fn; return a; }
-            }
-            a.type = E;
-            a.v.err = ERR_BAD_OP;
-            return a;
-        }
-    // Float op Integer
-    } else if (a.type == F) {
-        if (b.type == I) {
-            b.type = F;
-            b.v.fn = b.v.in;
-            if (strcmp(op, "+") == 0) { a.v.fn += b.v.fn; return a; }
-            if (strcmp(op, "-") == 0) { a.v.fn -= b.v.fn; return a; }
-            if (strcmp(op, "*") == 0) { a.v.fn *= b.v.fn; return a; }
-            if (strcmp(op, "/") == 0) {
-                if (b.v.in == 0) { a.type = E; a.v.err = ERR_DIV_ZERO; return a; }
-                else             { a.v.fn /= b.v.fn; return a; }
-            }
-            a.type = E;
-            a.v.err = ERR_BAD_OP;
-            return a;
-    // Float op Float
-        } else if (b.type == F) {
-            if (strcmp(op, "+") == 0) { a.v.fn += b.v.fn; return a; }
-            if (strcmp(op, "-") == 0) { a.v.fn -= b.v.fn; return a; }
-            if (strcmp(op, "*") == 0) { a.v.fn *= b.v.fn; return a; }
-            if (strcmp(op, "/") == 0) {
-                if (b.v.in == 0) { a.type = E; a.v.err = ERR_DIV_ZERO; return a; }
-                else             { a.v.fn /= b.v.fn; return a; }
-            }
-            a.type = E;
-            a.v.err = ERR_BAD_OP;
-            return a;
-        }
-    }
-    a.type = E;
-    a.v.err = ERR_BAD_NUM;
-    return a;
-}
-
-
 lval* lval_pop(lval* vs, int i) {
-    if (vs->type != SE) {
-        return newE(ERR_NOT_SEXPR, "lval_pop invoked with not an S-expression");
-    }
-    if (i >= vs->count) {
-        return newE(ERR_OUT_OF_BOUND, "lval_pop invoked with out of bound index");
-    }
+//    LASSERT(vs, vs->type == SE, ERR_NOT_SEXPR,
+//            "lval_pop passed not S-expression");
+//    LASSERT(vs, i < vs->count && i >= 0, ERR_OUT_OF_BOUND,
+//            "lval_pop invoked with out of bound index");
 
     lval* v = vs->cell[i];
 
@@ -311,13 +269,10 @@ lval* lval_pop(lval* vs, int i) {
 }
 
 lval* lval_take(lval* vs, int i) {
-    if (vs->type != SE) {
-        return newE(ERR_NOT_SEXPR, "lval_pop invoked with not an S-expression");
-    }
-
-    if (i >= vs->count || i < 0) {
-        return newE(ERR_OUT_OF_BOUND, "lval_pop invoked with out of bound index");
-    }
+//    LASSERT(vs, vs->type == SE, ERR_NOT_SEXPR,
+//            "lval_take passed not S-expression");
+//    LASSERT(vs, i < vs->count && i >= 0, ERR_OUT_OF_BOUND,
+//            "lval_take invoked with out of bound index");
 
      lval* v = lval_pop(vs, i);
 
@@ -336,34 +291,124 @@ lval* lval_eval(lval* v) {
     return v;
 }
 
-lval* builtin_op(lval* vs, lval* sym) {
+lval* builtin_head(lval* vs) {
+
+    LASSERT(vs, vs->count == 1,
+        ERR_NOT_QEXPR, "Function 'head' passed too many arguments.");
+    LASSERT(vs, vs->cell[0]->type == Q,
+        ERR_NOT_QEXPR, "Function 'head' passed incorrect type.");
+    LASSERT(vs, vs->cell[0]->count != 0,
+        ERR_NOT_QEXPR, "Function 'head' passed {}");
+
+
+    lval* v = lval_take(vs, 0);
+
+    // TODO: Make it work without while...
+    while (v->count > 1) { lval_del(lval_pop(v, 1)); }
+    return v;
+
+}
+
+lval* builtin_tail(lval* vs) {
+
+    LASSERT(vs, vs->count == 1,
+        ERR_NOT_QEXPR, "Function 'tail' passed too many arguments.");
+    LASSERT(vs, vs->cell[0]->type == Q,
+        ERR_NOT_QEXPR, "Function 'tail' passed incorrect type.");
+    LASSERT(vs, vs->cell[0]->count != 0,
+        ERR_NOT_QEXPR, "Function 'tail' passed {}");
+
+    lval* v = lval_take(vs, 0);
+    lval_println(v);
+    lval_del(lval_pop(v, 0));
+    return v;
+}
+
+lval* lval_join(lval* a, lval* b) {
+
+    while (b->count) {
+        a = lval_add(b, lval_pop(b, 0));
+    }
+
+    lval_del(b);
+    return a;
+}
+
+lval* builtin_join(lval* vs) {
+    for (int i = 0; i < vs->count; i++) {
+        LASSERT(vs, vs->cell[i]->type == Q,
+            ERR_NOT_QEXPR, "Function 'join' passed incorrect type.")
+    }
+
+    lval* v = lval_pop(vs, 0);
+
+    while (vs->count) {
+        v = lval_join(v, lval_pop(vs, 0));
+    }
+
+    lval_del(vs);
+    return v;
+
+}
+
+lval* builtin_list(lval* a) {
+    a->type = Q;
+    return a;
+}
+
+lval* builtin_eval(lval* vs) {
+    LASSERT(vs, vs->count == 1,
+            ERR_BAD_OP, "Function 'eval' passed too many arguments.");
+    LASSERT(vs, vs->cell[0]->type == Q,
+            ERR_BAD_OP, "Function 'eval' passed incorrect type.");
+
+    lval* a = lval_take(vs, 0);
+    a->type = SE;
+    return lval_eval(a);
+}
+
+lval* builtin_op(lval* vs, enum stype op);
+
+lval* builtin(lval* a, enum stype st) {
+    switch (st) {
+        case PLUS:  { return builtin_op(a, st); }
+        case MINUS: { return builtin_op(a, st); }
+        case MUL:   { return builtin_op(a, st); }
+        case DIV:   { return builtin_op(a, st); }
+        case LIST:  { return builtin_list(a); }
+        case HEAD:  { return builtin_head(a); }
+        case TAIL:  { return builtin_tail(a); }
+        case JOIN:  { return builtin_join(a); }
+        case EVAL:  { return builtin_eval(a); }
+        default :   { lval_del(a); return newE(ERR_BAD_OP, "Unknown function."); }
+    }
+}
+
+
+lval* builtin_op(lval* vs, enum stype op) {
     if (vs->type != SE) {
         return newE(ERR_NOT_SEXPR, "Operation over not the S-expression");
     }
     if (vs->count < 1) {
         return newE(ERR_NOT_SEXPR, "Unsupported number of arguments the an S-expression");
     }
-    if (sym->type != SY) {
-        return newE(ERR_NOT_SEXPR, "Not a symboal as first argument in the S-expression");
-    }
+
     for (int i = 0; i < vs->count; i++) {
         if (vs->cell[i]->type != I && vs->cell[i]->type != F) {
             lval_del(vs);
-            lval_del(sym);
             return newE(ERR_NOT_SEXPR, "NaN operand in the S-expression");
         }
     }
 
     lval* a = lval_pop(vs, 0);
 
-    if (sym->v.sym == MINUS && vs->count == 0) {
+    if (op == MINUS && vs->count == 0) {
         switch (a->type) {
             case I: a->v.in = -a->v.in; break;
             case F: a->v.fn = -a->v.fn; break;
             default:
                 lval_del(vs);
                 lval_del(a);
-                lval_del(sym);
                 return newE(ERR_NOT_SEXPR, "NaN operand in the S-expression");
                 break;
         }
@@ -376,43 +421,50 @@ lval* builtin_op(lval* vs, lval* sym) {
             case I:
                 switch (b->type) {
                     case I:
-                        switch (sym->v.sym) {
+                        switch (op) {
                             case PLUS:  a->v.in += b->v.in; break;
                             case MINUS: a->v.in -= b->v.in; break;
                             case MUL:   a->v.in *= b->v.in; break;
                             case DIV:
                                 if (b->v.in == 0) {
-                                    lval_del(a); lval_del(b); lval_del(sym);
+                                    lval_del(a); lval_del(b);
                                     lval_del(vs);
                                     return newE(ERR_DIV_ZERO,"");
                                 }
                                 a->v.in /= b->v.in;
                                 break;
+                            default:
+                                lval_del(a); lval_del(b);
+                                lval_del(vs);
+                                return newE(ERR_BAD_OP,"Unknown operation");
+
                         }
                         break;
                     case F:
-                        printf("I'm here! 1 ");
                         a->type = F;
                         a->v.fn = a->v.in;
-                        switch (sym->v.sym) {
+                        switch (op) {
                             case PLUS:  a->v.fn += b->v.fn; break;
                             case MINUS: a->v.fn -= b->v.fn; break;
                             case MUL:   a->v.fn *= b->v.fn; break;
                             case DIV:
                                 if (b->v.fn == 0) {
-                                    lval_del(a); lval_del(b); lval_del(sym);
+                                    lval_del(a); lval_del(b);
                                     lval_del(vs);
                                     return newE(ERR_DIV_ZERO,"");
                                 }
                                 a->v.fn /= b->v.fn;
                                 break;
+                            default:
+                                lval_del(a); lval_del(b);
+                                lval_del(vs);
+                                return newE(ERR_BAD_OP,"Unknown operation");
                         }
                         break;
                     default:
                         lval_del(vs);
                         lval_del(a);
                         lval_del(b);
-                        lval_del(sym);
                         return newE(ERR_NOT_SEXPR, "NaN operand in the S-expression");
                         break;
                 }
@@ -422,40 +474,47 @@ lval* builtin_op(lval* vs, lval* sym) {
                     case I:
                         b->type = F;
                         b->v.fn = b->v.in;
-                        switch (sym->v.sym) {
+                        switch (op) {
                             case PLUS:  a->v.fn += b->v.fn; break;
                             case MINUS: a->v.fn -= b->v.fn; break;
                             case MUL:   a->v.fn *= b->v.fn; break;
                             case DIV:
                                 if (b->v.fn == 0) {
-                                    lval_del(a); lval_del(b); lval_del(sym);
+                                    lval_del(a); lval_del(b);
                                     lval_del(vs);
                                     return newE(ERR_DIV_ZERO,"");
                                 }
                                 a->v.fn /= b->v.fn;
                                 break;
+                            default:
+                                lval_del(a); lval_del(b);
+                                lval_del(vs);
+                                return newE(ERR_BAD_OP,"Unknown operation");
                         }
                         break;
                     case F:
-                        switch (sym->v.sym) {
+                        switch (op) {
                             case PLUS:  a->v.fn += b->v.fn; break;
                             case MINUS: a->v.fn -= b->v.fn; break;
                             case MUL:   a->v.fn *= b->v.fn; break;
                             case DIV:
                                 if (b->v.fn == 0) {
-                                    lval_del(a); lval_del(b); lval_del(sym);
+                                    lval_del(a); lval_del(b);
                                     lval_del(vs);
                                     return newE(ERR_DIV_ZERO,"");
                                 }
                                 a->v.fn /= b->v.fn;
                                 break;
+                            default:
+                                lval_del(a); lval_del(b);
+                                lval_del(vs);
+                                return newE(ERR_BAD_OP,"Unknown operation");
                         }
                         break;
                     default:
                         lval_del(vs);
                         lval_del(a);
                         lval_del(b);
-                        lval_del(sym);
                         return newE(ERR_NOT_SEXPR, "NaN operand in the S-expression");
                         break;
 
@@ -465,7 +524,6 @@ lval* builtin_op(lval* vs, lval* sym) {
                 lval_del(vs);
                 lval_del(a);
                 lval_del(b);
-                lval_del(sym);
                 return newE(ERR_NOT_SEXPR, "NaN operand in the S-expression");
                 break;
         }
@@ -501,7 +559,10 @@ lval* lval_eval_sexpr(lval* v) {
         return newE(ERR_NOT_SEXPR, "S-expression Does not start with symbol.");
     }
 
-    lval* result = builtin_op(v, sym);
+    enum stype s = sym->v.sym;
+    lval* result = builtin(v, s);
+    lval_del(sym);
+
     return result;
 }
 
@@ -513,34 +574,40 @@ int main(int argc, char** argv) {
     mpc_parser_t* Number  = mpc_new("number");
     mpc_parser_t* Symbol  = mpc_new("symbol");
     mpc_parser_t* Expr    = mpc_new("sexpr");
+    mpc_parser_t* Qexpr   = mpc_new("qexpr");
     mpc_parser_t* Sexpr   = mpc_new("expr");
     mpc_parser_t* Program = mpc_new("program");
 
     mpca_lang(MPCA_LANG_DEFAULT,
-            "                                                           \
-                integer     : /-?[0-9]+/ ;                              \
-                decimal     : /-?[0-9]+\\.[0-9]+/ ;                     \
-                number      : <decimal> | <integer> ;                   \
-                symbol      : '+' | '-' | '*' | '/' ;                   \
-                sexpr       : '(' <expr>* ')' ;   \
-                expr        : <number> | <symbol> | <sexpr> ;   \
-                program     : /^/ <expr>* /$/ ;              \
+            "                                                               \
+                integer     : /-?[0-9]+/ ;                                  \
+                decimal     : /-?[0-9]+\\.[0-9]+/ ;                         \
+                number      : <decimal> | <integer> ;                       \
+                symbol      : \"list\" | \"head\" | \"tail\" | \"quote\"    \
+                            | \"join\" | \"eval\" | '+' | '-' | '*' | '/' ; \
+                qexpr       : '{' <expr>* '}' ;                             \
+                sexpr       : '(' <expr>* ')' ;                             \
+                expr        : <number> | <symbol> | <sexpr> | <qexpr> ;     \
+                program     : /^/ <expr>* /$/ ;                             \
             ",
-            Integer, Decimal, Number, Symbol, Sexpr, Expr, Program);
+            Integer, Decimal, Number, Symbol, Qexpr, Sexpr, Expr, Program);
 
 
 
     // Print Version and Exit Informaton
-    puts("lis v0.4.0");
+    puts("lis v0.5.0");
     puts("Press ^C to Exit\n");
 
+    while(1) {
         mpc_result_t r;
 
         char* input = readline("> ");
         // Attempt to Parse the user Input
         if (mpc_parse("<stdin>", input, Program, &r)) {
-            //mpc_ast_print(r.output);
-            //lval_println(eval(r.output));
+            puts("AST:");
+            mpc_ast_print(r.output);
+            lval_println(lval_read(r.output));
+            puts("\nevaluation:");
             lval* x = lval_eval(lval_read(r.output));
             lval_println(x);
             lval_del(x);
@@ -551,9 +618,11 @@ int main(int argc, char** argv) {
         }
 
         add_history(input);
-        free (input);
+        free(input);
 
-    mpc_cleanup(7, Number, Decimal, Integer, Symbol, Sexpr, Expr, Program);
+    }
+
+    mpc_cleanup(8, Number, Decimal, Integer, Symbol, Qexpr, Sexpr, Expr, Program);
 
     return 0;
 }
