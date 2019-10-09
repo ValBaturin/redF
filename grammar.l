@@ -5,9 +5,13 @@ void yyerror (char *s);
 int yylex();
 %}
 %%
-\(      {return lbracket;}
-\)      {return rbracket;}
-[+-]?([0-9])+(\.([0-9])+)? {yylval.val = strtod(yytext, NULL); return number;}
-[ \t\n] ;
+\(                        {return lbracket;}
+\)                        {return rbracket;}
+"true"                    {yylval.b = true; return boolean;}
+"false"                   {yylval.b = false; return boolean;}
+"null"                    {return nulltoken;}
+[+-]?([0-9])+(\.([0-9])+) {yylval.r = strtod(yytext, NULL); return real;}
+[+-]?([0-9])+             {yylval.i = atoi(yytext); return integer;}
+[ \t\n]                   ;
 %%
 int yywrap(void) {return 1;}

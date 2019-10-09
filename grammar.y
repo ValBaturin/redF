@@ -9,14 +9,19 @@ int yylex();
 %}
 
 %union {
-    double val; int huy; Node* node;
+    double r; int i; bool b; Node* node;
 }
 
-%token number
+%token integer
+%token real
+%token boolean
 %token lbracket
 %token rbracket
+%token nulltoken
 
-%type <val> number
+%type <i> integer
+%type <r> real
+%type <b> boolean
 %type <node> list
 %type <node> entity
 %type <node> entities
@@ -25,14 +30,17 @@ int yylex();
 
 %%
 
-program: entity
+program: entity {yycurrent = $1; print(yycurrent); // remove last yycurrent node
+                }
 |        entity program;
-entity: number {$$ = newRNode($1);}
-|        list
-entities: entities entity   {addNode(yycurrent, $2);}
+entity: real      {$$ = newRNode($1);}
+|       integer   {$$ = newINode($1);}
+|       boolean   {$$ = newBNode($1);}
+|       nulltoken {$$ = newNNode();}
+|       list
+entities: entity entities   {addNode(yycurrent, $1);}
 |         entity            {addNode(yycurrent, $1);}
 list: lbracket entities rbracket { 
-    print(yycurrent);
     $$ = yycurrent;
     yycurrent = newLNode();
     }
