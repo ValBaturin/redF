@@ -45,6 +45,7 @@ enum stype {
     TAIL,
     JOIN,
     EVAL,
+    DEF,
     CUSTOM,
     UNKNSYM,
 };
@@ -122,6 +123,7 @@ lval* newSY(char* s) {
     else if (strcmp(s, "tail") == 0) { v->v.sym = TAIL; }
     else if (strcmp(s, "join") == 0) { v->v.sym = JOIN; }
     else if (strcmp(s, "eval") == 0) { v->v.sym = EVAL; }
+    else if (strcmp(s, "def") == 0) { v->v.sym = DEF; }
     else { v->v.sym = UNKNSYM; }
     return v;
 }
@@ -466,6 +468,28 @@ lval* builtin_join(lenv* env, lval* vs) {
 
 }
 
+lval* builtin_def(lenv* env, lval* v) {
+    LASSERT(v, v->cell[0]->type == Q, ERR_NOT_QEXPR,
+        "Function 'def' passed not a Q-expression");
+
+    lval* syms = v->cell[0];
+
+    for (int i = 0; i < syms->count; i++) {
+        LASSERT(v, syms->cell[i]->type == SY, ERR_BAD_OP,
+                "Function 'def' passed not a symbol in Q-expression");
+    }
+
+        LASSERT(v, syms->count == v->count-1, ERR_BAD_OP,
+                "Function 'def' passed unmatched symbols or values");
+
+    for (int i = 0; i < syms->count; i++) {
+        lenv_put(env, syms->cell[i], v->cell[i+1]);
+    }
+
+    lval_del(v);
+    return newSE();
+}
+
 lval* builtin_list(lenv* env, lval* a) {
     a->type = Q;
     return a;
@@ -755,6 +779,7 @@ lval* lval_eval(lenv* env, lval* atom) {
             case TAIL:  lval_del(atom); return newFUN(builtin_tail);
             case JOIN: lval_del(atom); return newFUN(builtin_join);
             case EVAL: lval_del(atom); return newFUN(builtin_eval);
+            case DEF: lval_del(atom); return newFUN(builtin_def);
             default:; // ; hack - https://stackoverflow.com/questions/18496282/why-do-i-get-a-label-can-only-be-part-of-a-statement-and-a-declaration-is-not-a
                 lval* v = lenv_get(env, atom);
                 lval_del(atom);
@@ -815,6 +840,7 @@ void lenv_add_builtins(lenv* env) {
     lenv_add_builtin(env, "tail", builtin_tail);
     lenv_add_builtin(env, "join", builtin_join);
     lenv_add_builtin(env, "eval", builtin_eval);
+    lenv_add_builtin(env, "def", builtin_def);
 }
 
 int main(int argc, char** argv) {
@@ -845,7 +871,7 @@ int main(int argc, char** argv) {
 
 
     // Print Version and Exit Informaton
-    puts("lis v0.6.0");
+    puts("lis v0.7.0");
     puts("Press ^C to Exit\n");
 
     lenv* env = new_lenv();
