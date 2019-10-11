@@ -50,3 +50,8 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+fi
+fi.dSYM/
+grammar.tab.c
+grammar.tab.h
+lex.yy.c
