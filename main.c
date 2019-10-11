@@ -1,14 +1,23 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
 #include <editline/readline.h>
 
 #include "mpc/mpc.h"
 
-#define LASSERT(args, cond, err, errm) \
-    if (!(cond)) { lval_del(args); return newE(err, errm); }
-#define LASSERT_SAFE(cond, err, errm) \
-    if (!(cond)) { return newE(err, errm); }
+#define LASSERT(args, cond, errt, fmt, ...) \
+    if (!(cond)) { \
+        lval* err = newE(errt, fmt, ##__VA_ARGS__); \
+        lval_del(args); \
+        return err; \
+    }
+
+#define LASSERT_SAFE(cond, errt, fmt, ...) \
+    if (!(cond)) { \
+        lval* err = newE(errt, fmt, ##__VA_ARGS__); \
+        return err; \
+    }
 
 
 // Expression type. l is for lis.
@@ -77,6 +86,20 @@ struct lval {
     struct lval** cell;
 };
 
+char* ltype_name(enum ltype type) {
+    switch(type) {
+
+        case I: return "Integer number";
+        case F: return "Decimal number";
+        case E: return "Error";
+        case SY: return "Symbol";
+        case SE: return "S-expression";
+        case Q: return "Q-expression";
+        case FUN: return "Function";
+        default: return "Unknown expression";
+    }
+}
+
 lenv* new_lenv() {
     lenv* env = malloc(sizeof(lenv));
     env->count = 0;
@@ -100,12 +123,20 @@ lval* newF(double x) {
     return v;
 }
 
-lval* newE(enum etype e, char* s) {
+lval* newE(enum etype e, char* fmt, ...) {
     lval* v = malloc(sizeof(lval));
     v->type = E;
-    v->err = malloc(strlen(s) + 1);
-    strcpy(v->err, s);
     v->v.err = e;
+
+    v->err = malloc(513);
+
+    va_list va;
+    va_start(va, fmt);
+
+    vsnprintf(v->err, 512, fmt, va);
+
+    v->err = realloc(v->err, strlen(v->err)+1);
+
     return v;
 }
 
@@ -382,7 +413,7 @@ lval* lenv_get(lenv* env, lval* var) {
         }
     }
 
-    return newE(ERR_NOT_DEFINED, "Variable is not defined");
+    return newE(ERR_NOT_DEFINED, "Variable %s is not defined", var->sym);
 }
 
 void lenv_put(lenv* env, lval* var, lval* v) {
@@ -413,7 +444,9 @@ lval* builtin_head(lenv* env, lval* vs) {
     LASSERT(vs, vs->count == 1,
         ERR_NOT_QEXPR, "Function 'head' passed too many arguments.");
     LASSERT(vs, vs->cell[0]->type == Q,
-        ERR_NOT_QEXPR, "Function 'head' passed incorrect type.");
+        ERR_NOT_QEXPR, "Function 'head' passed incorrect type for argument 0. "
+                       "Got %s, Exprected %s.",
+                       ltype_name(vs->cell[0]->type), ltype_name(Q));
     LASSERT(vs, vs->cell[0]->count != 0,
         ERR_NOT_QEXPR, "Function 'head' passed {}");
 
@@ -793,6 +826,7 @@ lval* lval_eval(lenv* env, lval* atom) {
     return atom;
 }
 
+
 lval* lval_eval_sexpr(lenv* env, lval* se) {
     for (int i = 0; i < se->count; i++) {
         se->cell[i] = lval_eval(env, se->cell[i]);
@@ -871,7 +905,7 @@ int main(int argc, char** argv) {
 
 
     // Print Version and Exit Informaton
-    puts("lis v0.7.0");
+    puts("lis v0.8.0");
     puts("Press ^C to Exit\n");
 
     lenv* env = new_lenv();
