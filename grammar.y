@@ -9,19 +9,21 @@ int yylex();
 %}
 
 %union {
-    double r; int i; bool b; Node* node;
+    double r; int i; bool b; char* s; Node* node;
 }
 
 %token integer
 %token real
 %token boolean
+%token nulltoken
+%token symbol
 %token lbracket
 %token rbracket
-%token nulltoken
 
 %type <i> integer
 %type <r> real
 %type <b> boolean
+%type <s> symbol
 %type <node> list
 %type <node> entity
 %type <node> entities
@@ -37,6 +39,7 @@ entity: real      {$$ = newRNode($1);}
 |       integer   {$$ = newINode($1);}
 |       boolean   {$$ = newBNode($1);}
 |       nulltoken {$$ = newNNode();}
+|       symbol    {$$ = newANode($1);}
 |       list
 entities: entity entities   {addNode(yycurrent, $1);}
 |         entity            {addNode(yycurrent, $1);}

@@ -49,6 +49,13 @@ Node* newNNode() {
     return node;
 }
 
+Node* newANode(char* s) {
+    Node* node = malloc(sizeof(Node));
+    node->type = 1;
+    node->n = 0;
+    printf("ANode %p\n with value: %s\n", node, s);
+    return node;
+}
 
 Node* newLNode() {
     Node* node = malloc(sizeof(Node));
