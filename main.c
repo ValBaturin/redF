@@ -12,13 +12,25 @@
         lval_del(args); \
         return err; \
     }
-
 #define LASSERT_SAFE(cond, errt, fmt, ...) \
     if (!(cond)) { \
         lval* err = newE(errt, fmt, ##__VA_ARGS__); \
         return err; \
     }
-
+#define LASSERT_NUM(where, v, num) \
+    if ((v->count) != num) { \
+        lval* err = newE(ERR_BAD_OP, "%s passed wrong num of args, expected %i, got %i", \
+                where, num, v->count); \
+        lval_del(v); \
+        return err; \
+    }
+#define LASSERT_TYPE(where, v, argn, expected) \
+    if ((v->cell[argn]->type) != expected) { \
+        lval* err = newE(ERR_BAD_OP, "%s passed wrong type as %i arg, expected %s", \
+                where, argn, ltype_name(expected)); \
+        lval_del(v); \
+        return err; \
+    }
 
 // Expression type. l is for lis.
 // I - Integer
@@ -55,6 +67,8 @@ enum stype {
     JOIN,
     EVAL,
     DEF,
+    ASSGN,
+    LAMBDA,
     CUSTOM,
     UNKNSYM,
 };
@@ -67,28 +81,38 @@ typedef lval*(*lbuiltin)(lenv*, lval*);
 
 struct lenv {
     int count;
+    lenv* par; // parent environment
     char** syms;
     lval** vals;
 };
 
 struct lval {
     enum ltype type;
+    // lval value
     union {
+        // Number values
         long int in;
         double fn;
-        lbuiltin func;
+        // Err value
         enum etype err;
+        // Symbol value
         enum stype sym;
-    } v;
-    char* err;
-    char* sym;
-    int count;
-    struct lval** cell;
+        // func value
+        struct {
+                lbuiltin builtin; // Points if it is builtin func
+                lenv* env;
+                lval* params;
+                lval* body;
+            } funcv;
+        } v;
+        char* err;
+        char* sym;
+        int count;
+        lval** cell;
 };
 
 char* ltype_name(enum ltype type) {
     switch(type) {
-
         case I: return "Integer number";
         case F: return "Decimal number";
         case E: return "Error";
@@ -102,6 +126,7 @@ char* ltype_name(enum ltype type) {
 
 lenv* new_lenv() {
     lenv* env = malloc(sizeof(lenv));
+    env->par = NULL;
     env->count = 0;
     env->syms = NULL;
     env->vals = NULL;
@@ -154,8 +179,9 @@ lval* newSY(char* s) {
     else if (strcmp(s, "tail") == 0) { v->v.sym = TAIL; }
     else if (strcmp(s, "join") == 0) { v->v.sym = JOIN; }
     else if (strcmp(s, "eval") == 0) { v->v.sym = EVAL; }
+    else if (strcmp(s, "\\") == 0) { v->v.sym = LAMBDA; }
     else if (strcmp(s, "def") == 0) { v->v.sym = DEF; }
-    else { v->v.sym = UNKNSYM; }
+    else { v->v.sym = CUSTOM; }
     return v;
 }
 
@@ -180,9 +206,25 @@ lval* newFUN(lbuiltin func) {
     v->type = FUN;
     v->count = 0;
     v->cell = NULL;
-    v->v.func = func;
+    v->v.funcv.builtin = func;
     return v;
 }
+
+lval* newLambda(lval* params, lval* body) {
+    lval* v = malloc(sizeof(lval));
+    v->type = FUN;
+
+    v->v.funcv.builtin = NULL;
+
+    v->v.funcv.env = new_lenv();
+
+    v->v.funcv.params = params;
+    v->v.funcv.body = body;
+
+    return v;
+}
+
+void lenv_del(lenv* env);
 
 void lval_del(lval* v) {
     switch (v->type) {
@@ -192,7 +234,13 @@ void lval_del(lval* v) {
         case E: free(v->err); break;
         case SY: free(v->sym); break;
 
-        case FUN: break;
+        case FUN:
+            if (!v->v.funcv.builtin) {
+                lenv_del(v->v.funcv.env);
+                lval_del(v->v.funcv.params);
+                lval_del(v->v.funcv.body);
+            }
+            break;
 
         case SE:
         case Q:
@@ -282,7 +330,14 @@ void lval_print(lval* v) {
         case SY: printf("%s", v->sym); break;
         case SE: lval_expr_print(v, '(', ')'); break;
         case Q:  lval_expr_print(v, '{', '}'); break;
-        case FUN: printf("<function>"); break;
+        case FUN:
+            if (v->v.funcv.builtin) {
+                printf("<builtin>");
+            } else {
+                printf("(\\ "); lval_print(v->v.funcv.params);
+                putchar(' '); lval_print(v->v.funcv.body); putchar(')');
+            }
+            break;
         case E:
             if (strcmp(v->err, "") == 0) {
                 switch (v->v.err) {
@@ -365,8 +420,24 @@ lval* lval_take(lval* vs, int i) {
      lval_del(vs);
 
      return v;
+}
 
+lval* lval_copy(lval* v);
 
+lenv* lenv_copy(lenv* env) {
+    lenv* nenv = malloc(sizeof(lenv));
+    nenv->par = env->par;
+    nenv->count = env->count;
+    nenv->syms = malloc(sizeof(char*) * nenv->count);
+    nenv->vals = malloc(sizeof(lval*) * nenv->count);
+
+    for (int i = 0; i < env->count; i++) {
+        nenv->syms[i] = malloc(strlen(env->syms[i]) + 1);
+        strcpy(nenv->syms[i], env->syms[i]);
+        nenv->vals[i] = lval_copy(env->vals[i]);
+    }
+
+    return nenv;
 }
 
 lval* lval_copy(lval* v) {
@@ -374,7 +445,6 @@ lval* lval_copy(lval* v) {
     copy->type = v->type;
 
     switch (v->type) {
-        case FUN: copy->v.func = v->v.func; break;
         case F: copy->v.fn = v->v.fn; break;
         case I: copy->v.in = v->v.in; break;
 
@@ -385,6 +455,7 @@ lval* lval_copy(lval* v) {
 
         case SY:
             copy->sym = malloc(strlen(v->sym) + 1);
+            copy->v.sym = v->v.sym;
             strcpy(copy->sym, v->sym);
             break;
 
@@ -394,6 +465,18 @@ lval* lval_copy(lval* v) {
             copy->cell = malloc(sizeof(lval*) * copy->count);
             for (int i = 0; i < copy->count; i++) {
                 copy->cell[i] = lval_copy(v->cell[i]);
+            }
+            break;
+
+        case FUN:
+            if (v->v.funcv.builtin) {
+                copy->v.funcv.builtin = v->v.funcv.builtin;
+            } else {
+                copy->v.funcv.builtin = NULL;
+                copy->v.funcv.env = lenv_copy(v->v.funcv.env);
+                copy->v.funcv.params = lval_copy(v->v.funcv.params);
+                copy->v.funcv.body = lval_copy(v->v.funcv.body );
+
             }
             break;
     }
@@ -413,9 +496,15 @@ lval* lenv_get(lenv* env, lval* var) {
         }
     }
 
-    return newE(ERR_NOT_DEFINED, "Variable %s is not defined", var->sym);
+    if (env->par) {
+        return lenv_get(env->par, var);
+    } else {
+        return newE(ERR_NOT_DEFINED, "Variable %s is not defined", var->sym);
+    }
+
 }
 
+// Put var in local (innermost, passed) environment
 void lenv_put(lenv* env, lval* var, lval* v) {
 
     for (int i = 0; i < env->count; i++) {
@@ -434,6 +523,16 @@ void lenv_put(lenv* env, lval* var, lval* v) {
     env->syms[env->count-1] = malloc(strlen(var->sym)+1);
     strcpy(env->syms[env->count-1], var->sym);
 
+    return;
+}
+
+// Put var in global environment
+void lenv_def(lenv* env, lval* var, lval* v) {
+    while (env->par) {
+        env = env->par;
+    }
+
+    lenv_put(env, var, v);
     return;
 }
 
@@ -501,26 +600,70 @@ lval* builtin_join(lenv* env, lval* vs) {
 
 }
 
-lval* builtin_def(lenv* env, lval* v) {
-    LASSERT(v, v->cell[0]->type == Q, ERR_NOT_QEXPR,
-        "Function 'def' passed not a Q-expression");
+lval* builtin_var(lenv* env, lval* v, enum stype stype) {
+    LASSERT_TYPE("Var assignment func", v, 0, Q)
 
     lval* syms = v->cell[0];
 
     for (int i = 0; i < syms->count; i++) {
         LASSERT(v, syms->cell[i]->type == SY, ERR_BAD_OP,
-                "Function 'def' passed not a symbol in Q-expression");
+                "Var assignment function cannot define symbol"
+                "Got %s, Expected %s.",
+                ltype_name(syms->cell[i]->type),
+                ltype_name(SY));
     }
 
-        LASSERT(v, syms->count == v->count-1, ERR_BAD_OP,
-                "Function 'def' passed unmatched symbols or values");
+    LASSERT(v, syms->count == v->count-1, ERR_BAD_OP,
+            "Var assignment function passed unmatched symbols or values,"
+            "Got %i, Expected %i.",
+            syms->count,
+            v->count-1);
 
-    for (int i = 0; i < syms->count; i++) {
-        lenv_put(env, syms->cell[i], v->cell[i+1]);
+    switch (stype) {
+        case DEF:
+            for (int i = 0; i < syms->count; i++) {
+                lenv_def(env, syms->cell[i], v->cell[i+1]);
+            }
+            break;
+        case ASSGN:
+            for (int i = 0; i < syms->count; i++) {
+                lenv_put(env, syms->cell[i], v->cell[i+1]);
+            }
+            break;
+        default:
+            lval_del(v);
+            return newE(ERR_BAD_OP, "def func fucked up");
+            break;
     }
 
     lval_del(v);
     return newSE();
+}
+
+lval* builtin_def(lenv* env, lval* v) {
+    return builtin_var(env, v, DEF);
+}
+
+lval* builtin_put(lenv* env, lval* v) {
+    return builtin_var(env, v, ASSGN);
+}
+
+lval* builtin_lambda(lenv* env, lval* v) {
+    LASSERT_NUM("Lambda", v, 2);
+    LASSERT_TYPE("Lambda", v, 0, Q);
+    LASSERT_TYPE("Lambda", v, 1, Q);
+
+    for (int i = 0; i < v->cell[0]->count; i++) {
+        LASSERT(v, (v->cell[0]->cell[i]->type == SY), ERR_BAD_OP,
+                "Cannot define non-symbol. Got %s, Expected %s.",
+                ltype_name(v->cell[0]->cell[i]->type), ltype_name(SY))
+    }
+
+    lval* params = lval_pop(v, 0);
+    lval* body = lval_pop(v, 0);
+    lval_del(v);
+
+    return newLambda(params, body);
 }
 
 lval* builtin_list(lenv* env, lval* a) {
@@ -558,28 +701,28 @@ lval* builtin_eval(lenv* env, lval* vs) {
 //     }
 // }
 
-lval* builtin_add(lenv* env, lval* vs) {
-    if (vs->count < 2) {
-        return newE(ERR_NOT_SEXPR, "Unsupported number of arguments in the S-expression");
-    }
+    lval* builtin_add(lenv* env, lval* vs) {
+        if (vs->count < 2) {
+            return newE(ERR_NOT_SEXPR, "Unsupported number of arguments in the S-expression");
+        }
 
 
-    lval* a = lval_pop(vs, 0);
-    while (vs->count > 0) {
-        lval* b = lval_pop(vs, 0);
-        switch (a->type) {
-            case I:
-                switch (b->type) {
-                    case I: a->v.in += b->v.in; break;
-                    case F:
-                        a->type = F;
-                        a->v.fn = a->v.in;
-                        a->v.fn += b->v.fn;
-                        break;
-                    default:
-                        lval_del(a); lval_del(b);
-                        lval_del(vs);
-                        return newE(ERR_NOT_SEXPR, "Add on NaN operand");
+        lval* a = lval_pop(vs, 0);
+        while (vs->count > 0) {
+            lval* b = lval_pop(vs, 0);
+            switch (a->type) {
+                case I:
+                    switch (b->type) {
+                        case I: a->v.in += b->v.in; break;
+                        case F:
+                            a->type = F;
+                            a->v.fn = a->v.in;
+                            a->v.fn += b->v.fn;
+                            break;
+                        default:
+                            lval_del(a); lval_del(b);
+                            lval_del(vs);
+                            return newE(ERR_NOT_SEXPR, "Add on NaN operand");
                 }
                 break;
             case F:
@@ -812,7 +955,9 @@ lval* lval_eval(lenv* env, lval* atom) {
             case TAIL:  lval_del(atom); return newFUN(builtin_tail);
             case JOIN: lval_del(atom); return newFUN(builtin_join);
             case EVAL: lval_del(atom); return newFUN(builtin_eval);
+            case LAMBDA: lval_del(atom); return newFUN(builtin_lambda);
             case DEF: lval_del(atom); return newFUN(builtin_def);
+            case ASSGN: lval_del(atom); return newFUN(builtin_put);
             default:; // ; hack - https://stackoverflow.com/questions/18496282/why-do-i-get-a-label-can-only-be-part-of-a-statement-and-a-declaration-is-not-a
                 lval* v = lenv_get(env, atom);
                 lval_del(atom);
@@ -826,8 +971,61 @@ lval* lval_eval(lenv* env, lval* atom) {
     return atom;
 }
 
+void env_print(lenv* env) {
+    puts("env_print");
+    for (int i = 0; i < env->count; i++) {
+        printf("sym - %s, lval - %s\n", env->syms[i], ltype_name(env->vals[i]->type));
+    }
+    if (env->par) {
+        puts("Have par");
+        env_print(env->par);
+    }
+    return;
+}
+
+lval* lval_call(lenv* env, lval* f, lval* v) {
+    // If we call builtin function, just return it
+    if (f->v.funcv.builtin) { return f->v.funcv.builtin(env, v); }
+
+    int given = v->count;
+    int total = f->v.funcv.params->count;
+
+    // Recursive partial function application
+    while (v->count) {
+        if (f->v.funcv.params->count == 0) {
+            lval_del(v);
+            return newE(ERR_BAD_OP,
+                    "Function passed too many arguments"
+                    "Got %i, Expected %i.", given, total);
+        }
+
+        lval* sym = lval_pop(f->v.funcv.params, 0);
+        lval* val = lval_pop(v, 0);
+        lenv_put(f->v.funcv.env, sym, val);
+
+        lval_del(sym); lval_del(val);
+    }
+
+    lval_del(v);
+
+    // Full bound func is to evaluate
+    if (f->v.funcv.params->count == 0) {
+        f->v.funcv.env->par = env;
+
+        return builtin_eval(f->v.funcv.env,
+                lval_add(newSE(), lval_copy(f->v.funcv.body)));
+    // Partially appliead func returned as is
+    } else {
+        return lval_copy(f);
+    }
+
+    return newE(ERR_BAD_OP, "lval_call reached end of function");
+}
+
+
 
 lval* lval_eval_sexpr(lenv* env, lval* se) {
+
     for (int i = 0; i < se->count; i++) {
         se->cell[i] = lval_eval(env, se->cell[i]);
     }
@@ -843,13 +1041,13 @@ lval* lval_eval_sexpr(lenv* env, lval* se) {
     if (se->count == 1) { return lval_take(se, 0); }
 
     lval* func = lval_pop(se, 0);
-    if (func ->type != FUN) {
+    if (func->type != FUN) {
         lval_del(func);
         lval_del(se);
         return newE(ERR_NOT_SEXPR, "S-expression Does not start with function.");
     }
 
-    lval* result = func->v.func(env, se);
+    lval* result = lval_call(env, func, se);
     lval_del(func);
 
     return result;
@@ -874,7 +1072,9 @@ void lenv_add_builtins(lenv* env) {
     lenv_add_builtin(env, "tail", builtin_tail);
     lenv_add_builtin(env, "join", builtin_join);
     lenv_add_builtin(env, "eval", builtin_eval);
+    lenv_add_builtin(env, "\\", builtin_lambda);
     lenv_add_builtin(env, "def", builtin_def);
+    lenv_add_builtin(env, "=", builtin_put);
 }
 
 int main(int argc, char** argv) {
@@ -905,7 +1105,7 @@ int main(int argc, char** argv) {
 
 
     // Print Version and Exit Informaton
-    puts("lis v0.8.0");
+    puts("lis v0.9.0");
     puts("Press ^C to Exit\n");
 
     lenv* env = new_lenv();
@@ -917,8 +1117,8 @@ int main(int argc, char** argv) {
         char* input = readline("> ");
         // Attempt to Parse the user Input
         if (mpc_parse("<stdin>", input, Program, &r)) {
-            puts("AST:");
-            mpc_ast_print(r.output);
+//            puts("AST:");
+//            mpc_ast_print(r.output);
             lval_println(lval_read(r.output));
             puts("\nevaluation:");
             lval* x = lval_eval(env, lval_read(r.output));
