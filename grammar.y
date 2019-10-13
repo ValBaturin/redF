@@ -9,7 +9,7 @@ int yylex();
 %}
 
 %union {
-    double r; int i; bool b; char* s; Node* node;
+    double r; int i; bool b; char* s; ast_node* node;
 }
 
 %token integer
@@ -32,7 +32,7 @@ int yylex();
 
 %%
 
-program: entity {yycurrent = $1; print(yycurrent); // remove last yycurrent node
+program: entity {yycurrent = $1; // print(yycurrent); // remove last yycurrent node
                 }
 |        entity program;
 entity: real      {$$ = newRNode($1);}

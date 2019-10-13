@@ -1,41 +1,63 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <stdbool.h>
 
 int yyparse(void);
 int yylex(void);
 void yyerror(char *s);
 
-typedef struct Node Node;
+typedef struct ast_node ast_node;
 
-Node* newLNode();
+ast_node* newLNode();
 
-struct Node
-{
-    int type;
-    
-    double value;
-    int n;
-    Node** nodes;
+enum asttype {
+    AST_REAL,
+    AST_BOOL,
+    AST_INT,
+    AST_NULL,
+    AST_ATOM,
+    AST_LIST,
 };
 
-void addNode(Node* dad, Node* child);
+struct ast_node
+{
+    enum asttype type;
+    
+    union {
+        double r;
+        bool b;
+        int i;
+        char* a;
+        struct {
+            int size;
+            ast_node** nodes;
+        } children;
+    } value;
+};
 
-Node* newRNode(double v);
+void addNode(ast_node* dad, ast_node* child);
 
-Node* newBNode(bool v);
+ast_node* newRNode(double v);
 
-Node* newINode(int v);
+ast_node* newBNode(bool v);
 
-Node* newNNode();
+ast_node* newINode(int v);
 
-Node* newANode(char*);
+ast_node* newNNode();
 
+ast_node* newANode(char*);
 
-Node* newNode();
+ast_node* newNode();
 
-void print(Node* n);
+void print(ast_node* n);
 
-extern Node* yycurrent;
+extern ast_node* yycurrent;
 
-Node* yydrop_node(Node* n);
+ast_node* yydrop_node(ast_node* n);
+
+typedef struct yy_buffer_state * YY_BUFFER_STATE;
+extern int yyparse();
+extern YY_BUFFER_STATE yy_scan_string(const char * str);
+extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
+

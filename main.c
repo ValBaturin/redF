@@ -4,7 +4,8 @@
 
 #include <editline/readline.h>
 
-#include "mpc/mpc.h"
+#include "fi.h"
+#include "grammar.tab.h"
 
 #define LASSERT(args, cond, errt, fmt, ...) \
     if (!(cond)) { \
@@ -278,28 +279,6 @@ void lenv_del(lenv* env) {
     return;
 }
 
-lval* lval_read_int(mpc_ast_t* t) {
-    errno = 0;
-    long int v = strtol(t->contents, NULL, 10);
-    return errno != ERANGE ? newI(v)
-                           : newE(ERR_BAD_NUM, "invalid number");
-}
-
-
-lval* lval_read_float(mpc_ast_t* t) {
-    errno = 0;
-    double v = strtod(t->contents, NULL);
-    return errno != ERANGE ? newF(v)
-                           : newE(ERR_BAD_NUM, "invalid number");
-
-}
-
-lval* lval_read_num(mpc_ast_t* t) {
-    if (strstr(t->tag, "integer")) { return lval_read_int(t); }
-    if (strstr(t->tag, "decimal")) { return lval_read_float(t); }
-    return newE(ERR_UNK, "Tried to parse number out of thin air");
-}
-
 lval* lval_add(lval* vs, lval* v) {
     vs->count++;
     vs->cell = realloc(vs->cell, sizeof(lval*) * vs->count);
@@ -307,29 +286,23 @@ lval* lval_add(lval* vs, lval* v) {
     return vs;
 }
 
-lval* lval_read(mpc_ast_t* t) {
-    // Terminals
-    if (strstr(t->tag, "number")) { return lval_read_num(t); }
-    if (strstr(t->tag, "symbol")) { return newSY(t->contents); }
+lval* lval_read(ast_node* t) {
+    if (t->type == AST_REAL) { return newF(t->value.r); }
+    if (t->type == AST_INT) { return newI(t->value.i); }
+    if (t->type == AST_ATOM) { return newSY(t->value.a); }
+    // TODO add support for the rest of types
 
-    // New branch
-    lval* v = NULL;
-    if      (strstr(t->tag, "sexpr"))  { v = newSE(); }
-    else if (strstr(t->tag, "qexpr"))  { v = newQ();  }
-    else if (strcmp(t->tag, ">") == 0) { v = newSE(); }
+    if (t->type == AST_LIST) {
+        lval* v = NULL;
+        v = newSE();
 
+        for (int i = t->value.children.size - 1; i >= 0; --i) {
+            v = lval_add(v, lval_read(t->value.children.nodes[i]));
+        }
 
-    // Fill this new branch with contained expressions
-    for (int i = 0; i < t->children_num; i++) {
-        if (strcmp(t->children[i]->contents, "(") == 0) { continue; }
-        if (strcmp(t->children[i]->contents, ")") == 0) { continue; }
-        if (strcmp(t->children[i]->contents, "{") == 0) { continue; }
-        if (strcmp(t->children[i]->contents, "}") == 0) { continue; }
-        if (strcmp(t->children[i]->tag, "regex") == 0) { continue; }
-        v = lval_add(v, lval_read(t->children[i]));
+        return v;
     }
-
-    return v;
+    return NULL;
 }
 
 void lval_expr_print(lval* v, char open, char close);
@@ -1183,31 +1156,6 @@ void lenv_add_builtins(lenv* env) {
 
 int main(int argc, char** argv) {
 
-    // Create parsers
-    mpc_parser_t* Integer = mpc_new("integer");
-    mpc_parser_t* Decimal = mpc_new("decimal");
-    mpc_parser_t* Number  = mpc_new("number");
-    mpc_parser_t* Symbol  = mpc_new("symbol");
-    mpc_parser_t* Expr    = mpc_new("sexpr");
-    mpc_parser_t* Qexpr   = mpc_new("qexpr");
-    mpc_parser_t* Sexpr   = mpc_new("expr");
-    mpc_parser_t* Program = mpc_new("program");
-
-    mpca_lang(MPCA_LANG_DEFAULT,
-            "                                                               \
-                integer     : /-?[0-9]+/ ;                                  \
-                decimal     : /-?[0-9]+\\.[0-9]+/ ;                         \
-                number      : <decimal> | <integer> ;                       \
-                symbol      : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ;            \
-                qexpr       : '{' <expr>* '}' ;                             \
-                sexpr       : '(' <expr>* ')' ;                             \
-                expr        : <number> | <symbol> | <sexpr> | <qexpr> ;     \
-                program     : /^/ <expr>* /$/ ;                             \
-            ",
-            Integer, Decimal, Number, Symbol, Qexpr, Sexpr, Expr, Program);
-
-
-
     // Print Version and Exit Informaton
     puts("lis v0.10.0");
     puts("Press ^C to Exit\n");
@@ -1216,30 +1164,19 @@ int main(int argc, char** argv) {
     lenv_add_builtins(env);
 
     while(1) {
-        mpc_result_t r;
-
         char* input = readline("> ");
-        // Attempt to Parse the user Input
-        if (mpc_parse("<stdin>", input, Program, &r)) {
-//            puts("AST:");
-//            mpc_ast_print(r.output);
-            lval_println(lval_read(r.output));
-            puts("\nevaluation:");
-            lval* x = lval_eval(env, lval_read(r.output));
-            lval_println(x);
-            lval_del(x);
-            mpc_ast_delete(r.output);
-        } else {
-            mpc_err_print(r.error);
-            mpc_err_delete(r.error);
-        }
+        yy_scan_string(input);
+        yycurrent = newLNode();
+        yyparse();
+
+        lval* x = lval_eval(env, lval_read(yycurrent));
+        lval_println(x);
+        lval_del(x);
 
         add_history(input);
         free(input);
 
     }
-
-    mpc_cleanup(8, Number, Decimal, Integer, Symbol, Qexpr, Sexpr, Expr, Program);
 
     return 0;
 }
