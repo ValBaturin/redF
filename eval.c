@@ -160,6 +160,11 @@ lval* lval_eval_special_sexpr(lenv* env, lval* se) {
             lval_del(sf);
             // Actually many builtin funcs
             // are good solutions to eval special forms
+            //
+            // As SetQ args passed not evaluated, do it now
+            for (int i = 1; i < se->count; i++) {
+                se->cell[i] = lval_eval(env, se->cell[i]);
+            }
             return builtin_var(env, se, DEF);
         case SPECIAL_LAMBDA:
             lval_del(sf);

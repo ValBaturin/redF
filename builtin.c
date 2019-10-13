@@ -128,7 +128,7 @@ lval* builtin_lambda(lenv* env, lval* v) {
             "Got %s, Expected %s.",
             ltype_name(v->type),
             ltype_name(SY));
-    LASSERT(v, v->cell[1]->type == SE || v->cell[1]->type == Q, ERR_BAD_OP,
+    LASSERT(v, v->cell[1]->type == SE, ERR_BAD_OP,
             "Lambda function passed wrong argument type"
             "Got %s, Expected %s.",
             ltype_name(v->type),
