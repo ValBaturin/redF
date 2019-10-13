@@ -1,3 +1,6 @@
+#ifndef AST
+#define AST
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -62,3 +65,4 @@ extern int yyparse();
 extern YY_BUFFER_STATE yy_scan_string(const char * str);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
 
+#endif

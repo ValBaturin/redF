@@ -1,5 +1,5 @@
 %{
-#include "fi.h"
+#include "ast.h"
 #include "grammar.tab.h"
 #include <unistd.h>
 
