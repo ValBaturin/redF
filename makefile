@@ -1,5 +1,5 @@
 fi: lex.yy.c grammar.tab.c
-	gcc -g lex.yy.c grammar.tab.c fi.c -o fi
+	gcc -g lex.yy.c grammar.tab.c fi.c -o fi -ledit -lm
 
 lex.yy.c: grammar.tab.c grammar.l
 	lex grammar.l

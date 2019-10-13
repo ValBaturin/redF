@@ -1,5 +1,6 @@
 #include "fi.h"
 #include "grammar.tab.h"
+#include <editline/readline.h>
 
 void yyerror(char *s)
 {
@@ -78,6 +79,10 @@ ast_node* yycurrent;
 
 int main()
 {
+    while (1) {
+    char* input = readline("> ");
+    yy_scan_string(input);
     yycurrent = newLNode();
     yyparse();
+    }
 }
