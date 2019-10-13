@@ -60,10 +60,17 @@ lval* newSY(char* s) {
     else if (strcmp(s, "eval") == 0) { v->v.sym = EVAL; }
     else if (strcmp(s, "\\") == 0) { v->v.sym = LAMBDA; }
     else if (strcmp(s, "def") == 0) { v->v.sym = DEF; }
+    else if (strcmp(s, "gt") == 0) { v->v.sym = GT; }
+    else if (strcmp(s, "lt") == 0) { v->v.sym = LT; }
+    else if (strcmp(s, "ge") == 0) { v->v.sym = GE; }
+    else if (strcmp(s, "le") == 0) { v->v.sym = LE; }
+    else if (strcmp(s, "ne") == 0) { v->v.sym = NE; }
+    else if (strcmp(s, "eq") == 0) { v->v.sym = EQ; }
     // Parse some symbols to special forms
     else if (strcmp(s, "quote") == 0) { v->v.sym = SPECIAL_QUOTE; }
     else if (strcmp(s, "setq") == 0) { v->v.sym = SPECIAL_SETQ; }
     else if (strcmp(s, "lambda") == 0) { v->v.sym = SPECIAL_LAMBDA; }
+    else if (strcmp(s, "cond") == 0) { v->v.sym = SPECIAL_COND; }
     else { v->v.sym = CUSTOM; }
     return v;
 }

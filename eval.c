@@ -1,4 +1,5 @@
 #include "eval.h"
+#include "builtin.h"
 
 lval* lval_eval(lenv* env, lval* atom) {
     // TODO: Resolve predefined symbols here?
@@ -16,7 +17,14 @@ lval* lval_eval(lenv* env, lval* atom) {
             case LAMBDA: lval_del(atom); return newFUN(builtin_lambda);
             case DEF: lval_del(atom); return newFUN(builtin_def);
             case ASSGN: lval_del(atom); return newFUN(builtin_put);
+            case LT: lval_del(atom); return newFUN(builtin_lt);
+            case GT: lval_del(atom); return newFUN(builtin_gt);
+            case LE: lval_del(atom); return newFUN(builtin_le);
+            case GE: lval_del(atom); return newFUN(builtin_ge);
+            case EQ: lval_del(atom); return newFUN(builtin_eq);
+            case NE: lval_del(atom); return newFUN(builtin_ne);
             // Specail forms remain to be a symbol and then get resolved in a different way
+            case SPECIAL_COND: 
             case SPECIAL_QUOTE:
             case SPECIAL_SETQ:
             case SPECIAL_LAMBDA:
@@ -87,7 +95,7 @@ lval* lval_call(lenv* env, lval* f, lval* v) {
         }
 
         lval* sym = lval_pop(f->v.funcv.params, 0);
-
+        
         // Mulstiparams special character
         if (strcmp(sym->sym, "&") == 0) {
 
@@ -169,6 +177,13 @@ lval* lval_eval_special_sexpr(lenv* env, lval* se) {
         case SPECIAL_LAMBDA:
             lval_del(sf);
             return builtin_lambda(env, se);
+        case SPECIAL_COND:
+            lval_del(sf);
+            // As COND 0 arg passed not evaluated, do it now
+            if (se->count > 0) {
+                se->cell[0] = lval_eval(env, se->cell[0]);
+            }
+            return builtin_cond(env, se);
 
         default: goto EXIT_EVAL_SPECIAL_SEXPR;
     }

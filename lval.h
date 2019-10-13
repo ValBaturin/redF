@@ -42,10 +42,17 @@ enum stype {
     LAMBDA,
     CUSTOM,
     UNKNSYM,
+    GT,
+    LT,
+    GE,
+    LE,
+    EQ,
+    NE,
     // Special forms
     SPECIAL_QUOTE,
     SPECIAL_SETQ,
     SPECIAL_LAMBDA,
+    SPECIAL_COND,
 };
 
 struct lval {

@@ -33,6 +33,20 @@ lval* builtin_mul(lenv* env, lval* vs);
 
 lval* builtin_div(lenv* env, lval* vs);
 
+lval* builtin_lt(lenv* env, lval* vs);
+
+lval* builtin_gt(lenv* env, lval* vs);
+
+lval* builtin_ge(lenv* env, lval* vs);
+
+lval* builtin_le(lenv* env, lval* vs);
+
+lval* builtin_eq(lenv* env, lval* vs);
+
+lval* builtin_ne(lenv* env, lval* vs);
+
+lval* builtin_cond(lenv* env, lval* vs);
+
 void lenv_add_builtin(lenv* env, char* name, lbuiltin func);
 
 void lenv_add_builtins(lenv* env);

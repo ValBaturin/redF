@@ -1,4 +1,5 @@
 #include "builtin.h"
+#include "lval.h"
 
 lval* builtin_head(lenv* env, lval* vs) {
 
@@ -403,6 +404,113 @@ lval* builtin_div(lenv* env, lval* vs) {
     lval_del(vs);
     return a;
 }
+
+lval* builtin_ord(lenv* env, lval* v, enum stype op) {
+    LASSERT_NUM(op, v, 2);
+    LASSERT_TYPE("builtin_ord", v, 0, I);
+    LASSERT_TYPE("builtin_ord", v, 1, I);
+
+    int r;
+    switch (op) {
+        case GT: r = (v->cell[0]->v.in > v->cell[1]->v.in); break;
+        case LT: r = (v->cell[0]->v.in < v->cell[1]->v.in); break;
+        case GE: r = (v->cell[0]->v.in >= v->cell[1]->v.in); break;
+        case LE: r = (v->cell[0]->v.in <= v->cell[1]->v.in); break;
+        default: lval_del(v); return newE(ERR_BAD_OP, "Wrong comparation operator");
+    }
+    lval_del(v);
+    return newI(r);
+}
+
+lval* builtin_gt(lenv* env, lval* v) {
+    return builtin_ord(env, v, GT);
+}
+
+lval* builtin_lt(lenv* env, lval* v) {
+    return builtin_ord(env, v, LT);
+}
+
+lval* builtin_ge(lenv* env, lval* v) {
+    return builtin_ord(env, v, GE);
+}
+
+lval* builtin_le(lenv* env, lval* v) {
+    return builtin_ord(env, v, LE);
+}
+
+int lval_eq(lval* a, lval* b) {
+    if (a->type != b->type) { return 0; }
+
+    switch (a->type) {
+        case I: return (a->v.in == b->v.in);
+        case F: return (a->v.fn == b->v.fn);
+
+        case E: return (strcmp(a->err, b->err) == 0);
+        case SY: return (strcmp(a->sym, b->sym) == 0);
+
+        case FUN:
+            if (a->v.funcv.builtin || b->v.funcv.builtin) {
+                return a->v.funcv.builtin == b->v.funcv.builtin;
+            } else {
+                return lval_eq(a->v.funcv.params, b->v.funcv.params)
+                    && lval_eq(a->v.funcv.body, b->v.funcv.body);
+            }
+
+        case SE:
+        case Q:
+            if (a->count != b->count) { return 0; }
+            for (int i = 0; i < a->count; i++) {
+                if (!lval_eq(a->cell[i], b->cell[i])) { return 0; }
+            }
+            return 1;
+        break;
+    }
+    return 0;
+}
+
+lval* builtin_cmp(lenv* env, lval* v, enum stype op) {
+    LASSERT_NUM(op, v, 2);
+    int r;
+    switch (op) {
+        case EQ: r = lval_eq(v->cell[0], v->cell[1]); break;
+        case NE: r = !lval_eq(v->cell[0], v->cell[1]); break;
+        default: lval_del(v); return newE(ERR_BAD_OP, "builtin_cmp fucked up");
+    }
+    lval_del(v);
+    return newI(r);
+}
+
+lval* builtin_eq(lenv* env, lval* v) {
+    return builtin_cmp(env, v, EQ);
+}
+
+lval* builtin_ne(lenv* env, lval* v) {
+    return builtin_cmp(env, v, NE);
+}
+
+lval* builtin_cond(lenv* env, lval* v) {
+    LASSERT_NUM("cond", v, 3);
+    LASSERT_TYPE("cond", v, 0, I);
+    LASSERT(v, v->cell[1]->type == SE || v->cell[0]->type == Q, ERR_BAD_OP,
+            "cond function passed wrong argument type");
+    LASSERT(v, v->cell[2]->type == SE || v->cell[1]->type == Q, ERR_BAD_OP,
+            "cond function passed wrong argument type");
+
+    lval* ret;
+    v->cell[1]->type = SE;
+    v->cell[2]->type = SE;
+
+    if (v->cell[0]->v.in) {
+        ret = lval_eval(env, lval_pop(v, 1));
+    } else {
+        ret = lval_eval(env, lval_pop(v, 2));
+    }
+
+    lval_del(v);
+    return ret;
+}
+
+
 
 void lenv_add_builtin(lenv* env, char* name, lbuiltin func) {
     lval* sym = newSY(name);
