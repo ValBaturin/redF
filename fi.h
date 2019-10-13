@@ -53,6 +53,7 @@ ast_node* newNode();
 void print(ast_node* n);
 
 extern ast_node* yycurrent;
+extern ast_node* yyprogram;
 
 ast_node* yydrop_node(ast_node* n);
 

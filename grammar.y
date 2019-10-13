@@ -32,9 +32,8 @@ int yylex();
 
 %%
 
-program: entity {yycurrent = $1; // print(yycurrent); // remove last yycurrent node
-                }
-|        entity program;
+program: entity {addNode(yyprogram, $1);}
+|        entity program {addNode(yyprogram, $1);}
 entity: real      {$$ = newRNode($1);}
 |       integer   {$$ = newINode($1);}
 |       boolean   {$$ = newBNode($1);}

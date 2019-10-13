@@ -1167,9 +1167,10 @@ int main(int argc, char** argv) {
         char* input = readline("> ");
         yy_scan_string(input);
         yycurrent = newLNode();
+        yyprogram = newLNode();
         yyparse();
 
-        lval* x = lval_eval(env, lval_read(yycurrent));
+        lval* x = lval_eval(env, lval_read(yyprogram));
         lval_println(x);
         lval_del(x);
 

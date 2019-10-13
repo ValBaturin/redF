@@ -76,6 +76,7 @@ void print(ast_node* n) {
 }
 
 ast_node* yycurrent;
+ast_node* yyprogram;
 
 //int main()
 //{
