@@ -32,7 +32,7 @@ int yylex();
 
 %%
 
-program: entity {yycurrent = $1; print(yycurrent); // remove last yycurrent node
+program: entity {yycurrent = $1; // print(yycurrent); // remove last yycurrent node
                 }
 |        entity program;
 entity: real      {$$ = newRNode($1);}
