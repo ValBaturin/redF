@@ -156,12 +156,18 @@ lval* builtin_list(lenv* env, lval* a) {
 lval* builtin_eval(lenv* env, lval* vs) {
     LASSERT(vs, vs->count == 1,
             ERR_BAD_OP, "Function 'eval' passed too many arguments.");
-    LASSERT(vs, vs->cell[0]->type == Q || vs->cell[0]->type == SE,
-            ERR_BAD_OP, "Function 'eval' passed incorrect type.");
+//    LASSERT(vs, vs->cell[0]->type == Q || vs->cell[0]->type == SE,
+//            ERR_BAD_OP, "Function 'eval' passed incorrect type %s.", ltype_name(vs->cell[0]->type));
 
-    lval* a = lval_take(vs, 0);
-    a->type = SE;
-    return lval_eval(env, a);
+    lval* ret = lval_take(vs, 0);
+    switch (ret->type) {
+        case Q:
+            ret->type = SE;
+            return lval_eval(env, ret);
+        case SE:
+            return lval_eval(env, ret);
+        default: return ret;
+    }
 }
 
 lval* builtin_add(lenv* env, lval* vs) {
