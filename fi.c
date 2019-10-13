@@ -1,89 +1,37 @@
-#include "fi.h"
+#include "lval.h"
+#include "lenv.h"
+#include "builtin.h"
+#include "eval.h"
+
+#include "ast.h"
 #include "grammar.tab.h"
 
-void yyerror(char *s)
-{
-  fprintf(stderr, "%s\n", s);
-}
+#include <editline/readline.h>
 
+int main(int argc, char** argv) {
 
-void addNode(Node* dad, Node* child) {
-    dad->n += 1;
-    dad->nodes = realloc(dad->nodes, sizeof(Node*) * (dad->n));
-    dad->nodes[(dad->n - 1)] = child;
-    printf("%p <- %p on %d\n", dad, dad->nodes[(dad->n - 1)], (dad->n - 1));
-}
+    // Print Version and Exit Informaton
+    puts("lis v0.12.1");
+    puts("Press ^C to Exit\n");
 
-Node* newRNode(double v) {
-    Node* node = malloc(sizeof(Node));
-    node->type = 1;
-    node->n = 0;
-    node->value = v;
-    printf("RNode %p\n", node);
-    return node;
-}
+    lenv* env = new_lenv();
+    lenv_add_builtins(env);
 
-Node* newINode(int v) {
-    Node* node = malloc(sizeof(Node));
-    node->type = 1;
-    node->n = 0;
-    node->value = v;
-    printf("INode %p\n", node);
-    return node;
-}
+    while(1) {
+        char* input = readline("> ");
+        yy_scan_string(input);
+        yycurrent = newLNode();
+        yyprogram = newLNode();
+        yyparse();
 
-Node* newBNode(bool v) {
-    Node* node = malloc(sizeof(Node));
-    node->type = 1;
-    node->n = 0;
-    node->value = v;
-    printf("BNode %p\n", node);
-    return node;
-}
+        lval* x = lval_eval(env, lval_read(yyprogram));
+        lval_println(x);
+        lval_del(x);
 
-Node* newNNode() {
-    Node* node = malloc(sizeof(Node));
-    node->type = 1;
-    node->n = 0;
-    printf("NNode %p\n", node);
-    return node;
-}
+        add_history(input);
+        free(input);
 
-Node* newANode(char* s) {
-    Node* node = malloc(sizeof(Node));
-    node->type = 1;
-    node->n = 0;
-    printf("ANode %p\n with value: %s\n", node, s);
-    return node;
-}
-
-Node* newLNode() {
-    Node* node = malloc(sizeof(Node));
-    node->type = 0;
-    node->n = 0;
-    node->nodes = malloc(sizeof(Node*));
-    printf("LNode %p\n", node);
-    return node;
-}
-
-void print(Node* n) {
-    printf("printing %p\n", n);
-    printf("type is %d\n", n->type);
-    printf("it has %d children:\n", n->n);
-    for (int i = 0; i < n->n; ++i) {
-        print(n->nodes[i]);
     }
-}
 
-Node* yycurrent;
-
-Node* yydrop_node(Node* n) {
-    n->n = 0;
-    return n;
-}
-
-int main()
-{
-    yycurrent = newLNode();
-    yyparse();
+    return 0;
 }

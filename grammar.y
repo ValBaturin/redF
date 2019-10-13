@@ -1,5 +1,5 @@
 %{
-#include "fi.h"
+#include "ast.h"
 #include "grammar.tab.h"
 #include <unistd.h>
 
@@ -9,7 +9,7 @@ int yylex();
 %}
 
 %union {
-    double r; int i; bool b; char* s; Node* node;
+    double r; int i; bool b; char* s; ast_node* node;
 }
 
 %token integer
@@ -32,9 +32,8 @@ int yylex();
 
 %%
 
-program: entity {yycurrent = $1; print(yycurrent); // remove last yycurrent node
-                }
-|        entity program;
+program: entity {addNode(yyprogram, $1);}
+|        entity program {addNode(yyprogram, $1);}
 entity: real      {$$ = newRNode($1);}
 |       integer   {$$ = newINode($1);}
 |       boolean   {$$ = newBNode($1);}
