@@ -72,6 +72,10 @@ enum stype {
     LAMBDA,
     CUSTOM,
     UNKNSYM,
+    // Special forms
+    SPECIAL_QUOTE,
+    SPECIAL_SETQ,
+    SPECIAL_LAMBDA,
 };
 
 // Forward declaration to allow type recursion
@@ -182,6 +186,10 @@ lval* newSY(char* s) {
     else if (strcmp(s, "eval") == 0) { v->v.sym = EVAL; }
     else if (strcmp(s, "\\") == 0) { v->v.sym = LAMBDA; }
     else if (strcmp(s, "def") == 0) { v->v.sym = DEF; }
+    // Parse some symbols to special forms
+    else if (strcmp(s, "quote") == 0) { v->v.sym = SPECIAL_QUOTE; }
+    else if (strcmp(s, "setq") == 0) { v->v.sym = SPECIAL_SETQ; }
+    else if (strcmp(s, "lambda") == 0) { v->v.sym = SPECIAL_LAMBDA; }
     else { v->v.sym = CUSTOM; }
     return v;
 }
@@ -210,6 +218,9 @@ lval* newFUN(lbuiltin func) {
     v->v.funcv.builtin = func;
     return v;
 }
+
+void lval_print(lval* v);
+void lval_println(lval* v) { lval_print(v); putchar('\n'); }
 
 lval* newLambda(lval* params, lval* body) {
     lval* v = malloc(sizeof(lval));
@@ -333,7 +344,6 @@ void lval_print(lval* v) {
 }
 
 
-void lval_println(lval* v) { lval_print(v); putchar('\n'); }
 
 
 void lval_expr_print(lval* v, char open, char close) {
@@ -574,7 +584,16 @@ lval* builtin_join(lenv* env, lval* vs) {
 }
 
 lval* builtin_var(lenv* env, lval* v, enum stype stype) {
-    LASSERT_TYPE("Var assignment func", v, 0, Q)
+    // LASSERT_TYPE("Var assignment func", v, 0, Q)
+    
+    // Starting from ver 0.10.0 builtin_var can also be passed special forms
+    // and thus should also accept SEs
+    LASSERT(v, v->type == SE || v->type == Q, ERR_BAD_OP,
+            "Var assignment function passed wrong argument type"
+            "Got %s, Expected %s.",
+            ltype_name(v->type),
+            ltype_name(SY));
+    
 
     lval* syms = v->cell[0];
 
@@ -623,8 +642,18 @@ lval* builtin_put(lenv* env, lval* v) {
 
 lval* builtin_lambda(lenv* env, lval* v) {
     LASSERT_NUM("Lambda", v, 2);
-    LASSERT_TYPE("Lambda", v, 0, Q);
-    LASSERT_TYPE("Lambda", v, 1, Q);
+
+    // TODO: multiparam assert macro
+    LASSERT(v, v->cell[0]->type == SE || v->cell[0]->type == Q, ERR_BAD_OP,
+            "Lambda function passed wrong argument type"
+            "Got %s, Expected %s.",
+            ltype_name(v->type),
+            ltype_name(SY));
+    LASSERT(v, v->cell[1]->type == SE || v->cell[1]->type == Q, ERR_BAD_OP,
+            "Lambda function passed wrong argument type"
+            "Got %s, Expected %s.",
+            ltype_name(v->type),
+            ltype_name(SY));
 
     for (int i = 0; i < v->cell[0]->count; i++) {
         LASSERT(v, (v->cell[0]->cell[i]->type == SY), ERR_BAD_OP,
@@ -649,7 +678,7 @@ lval* lval_eval(lenv* env, lval* atom);
 lval* builtin_eval(lenv* env, lval* vs) {
     LASSERT(vs, vs->count == 1,
             ERR_BAD_OP, "Function 'eval' passed too many arguments.");
-    LASSERT(vs, vs->cell[0]->type == Q,
+    LASSERT(vs, vs->cell[0]->type == Q || vs->cell[0]->type == SE,
             ERR_BAD_OP, "Function 'eval' passed incorrect type.");
 
     lval* a = lval_take(vs, 0);
@@ -931,6 +960,11 @@ lval* lval_eval(lenv* env, lval* atom) {
             case LAMBDA: lval_del(atom); return newFUN(builtin_lambda);
             case DEF: lval_del(atom); return newFUN(builtin_def);
             case ASSGN: lval_del(atom); return newFUN(builtin_put);
+            // Specail forms remain to be a symbol and then get resolved in a different way
+            case SPECIAL_QUOTE:
+            case SPECIAL_SETQ:
+            case SPECIAL_LAMBDA:
+                return atom;
             default:; // ; hack - https://stackoverflow.com/questions/18496282/why-do-i-get-a-label-can-only-be-part-of-a-statement-and-a-declaration-is-not-a
                 lval* v = lenv_get(env, atom);
                 lval_del(atom);
@@ -973,6 +1007,22 @@ lval* lval_call(lenv* env, lval* f, lval* v) {
         }
 
         lval* sym = lval_pop(f->v.funcv.params, 0);
+
+        // Mulstiparams special character
+        if (strcmp(sym->sym, "&") == 0) {
+
+            if (f->v.funcv.params->count != 1) {
+                lval_del(v);
+                return newE(ERR_BAD_OP,
+                        "Function format invalid"
+                        "Symbos '&' must be followed by a single symbol");
+            }
+
+            lval* nsym = lval_pop(f->v.funcv.params, 0);
+            lenv_put(f->v.funcv.env, nsym, builtin_list(env, v));
+            lval_del(sym); lval_del(nsym);
+            break;
+        }
         lval* val = lval_pop(v, 0);
         lenv_put(f->v.funcv.env, sym, val);
 
@@ -980,6 +1030,24 @@ lval* lval_call(lenv* env, lval* f, lval* v) {
     }
 
     lval_del(v);
+
+    // check {xs & ()} case
+    if (f->v.funcv.params->count > 0 &&
+            strcmp(f->v.funcv.params->cell[0]->sym, "&") == 0) {
+        if (f->v.funcv.params->count != 2) {
+            return newE(ERR_BAD_OP,
+                    "Function format invalid"
+                    "Symbol '&' must be followed by single symbol");
+        }
+
+        lval_del(lval_pop(f->v.funcv.params, 0));
+
+        lval* sym = lval_pop(f->v.funcv.params, 0);
+        lval* val = newQ();
+
+        lenv_put(f->v.funcv.env, sym, val);
+        lval_del(sym); lval_del(val);
+    }
 
     // Full bound func is to evaluate
     if (f->v.funcv.params->count == 0) {
@@ -995,13 +1063,50 @@ lval* lval_call(lenv* env, lval* f, lval* v) {
     return newE(ERR_BAD_OP, "lval_call reached end of function");
 }
 
+lval* lval_eval_special_sexpr(lenv* env, lval* se) {
 
+    // We don't assert anything here as we suppose that
+    // this function is called only after all asserts needed
+
+    // First symbol (exactly symbol) is a special form symbol
+    lval* sf = lval_pop(se, 0);
+
+    switch (sf->v.sym) {
+        case SPECIAL_QUOTE:
+            lval_del(sf);
+            // builtin_list ia a good solution to create Q-expression
+            return builtin_list(env, se);
+        case SPECIAL_SETQ:
+            lval_del(sf);
+            // Actually many builtin funcs
+            // are good solutions to eval special forms
+            return builtin_var(env, se, DEF);
+        case SPECIAL_LAMBDA:
+            lval_del(sf);
+            return builtin_lambda(env, se);
+
+        default: goto EXIT_EVAL_SPECIAL_SEXPR;
+    }
+
+EXIT_EVAL_SPECIAL_SEXPR:
+    lval_del(sf);
+    return newE(ERR_BAD_OP, "Unknown special form");
+
+}
 
 lval* lval_eval_sexpr(lenv* env, lval* se) {
 
+    if (se->count == 0) { return se; }
+
     for (int i = 0; i < se->count; i++) {
         se->cell[i] = lval_eval(env, se->cell[i]);
+        // Is it still a symbol? Evaluate it as a special form
+        if (i == 0 && se->cell[i]->type == SY) {
+            return lval_eval_special_sexpr(env, se);
+        }
+
     }
+
 
     for (int i = 0; i < se->count; i++) {
         if (se->cell[i]->type == E) {
@@ -1009,15 +1114,14 @@ lval* lval_eval_sexpr(lenv* env, lval* se) {
         }
     }
 
-    if (se->count == 0) { return se; }
-
     if (se->count == 1) { return lval_take(se, 0); }
 
     lval* func = lval_pop(se, 0);
     if (func->type != FUN) {
+        lval* err = newE(ERR_NOT_SEXPR, "S-expression Does not start with function, but with %s.", ltype_name(func->type));
         lval_del(func);
         lval_del(se);
-        return newE(ERR_NOT_SEXPR, "S-expression Does not start with function.");
+        return err;
     }
 
     lval* result = lval_call(env, func, se);
@@ -1052,7 +1156,8 @@ void lenv_add_builtins(lenv* env) {
 
 int main(int argc, char** argv) {
 
-    puts("lis v0.9.9");
+    // Print Version and Exit Informaton
+    puts("lis v0.10.0");
     puts("Press ^C to Exit\n");
 
     lenv* env = new_lenv();
