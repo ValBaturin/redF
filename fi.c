@@ -6,6 +6,8 @@
 #include "ast.h"
 #include "grammar.tab.h"
 
+#include "loadlib.h"
+
 #include <editline/readline.h>
 
 int main(int argc, char** argv) {
@@ -16,6 +18,8 @@ int main(int argc, char** argv) {
 
     lenv* env = new_lenv();
     lenv_add_builtins(env);
+
+    loadlib(env, "libraries/base.lisp");
 
     while(1) {
         char* input = readline("> ");
