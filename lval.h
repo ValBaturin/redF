@@ -24,7 +24,7 @@ enum ltype;
 // SE - S-expression
 // Q  - Q-expression
 // FUN - Function pointer
-enum ltype{I, F, E, SY, SE, Q, FUN};
+enum ltype{I, F, E, SY, SE, Q, FUN, N, B};
 
 // Symbol types
 enum stype {
@@ -53,6 +53,7 @@ enum stype {
     SPECIAL_SETQ,
     SPECIAL_LAMBDA,
     SPECIAL_COND,
+    SPECIAL_CONS,
 };
 
 struct lval {
@@ -62,6 +63,7 @@ struct lval {
         // Number values
         long int in;
         double fn;
+        bool b;
         // Err value
         enum etype err;
         // Symbol value
@@ -92,6 +94,10 @@ lval* newSE();
 
 lval* newQ();
 
+lval* newB(bool b);
+
+lval* newN();
+
 lval* newFUN(lbuiltin func);
 
 void lval_print(lval* v);
@@ -103,6 +109,8 @@ lval* newLambda(lval* params, lval* body);
 void lval_del(lval* v);
 
 lval* lval_add(lval* vs, lval* v);
+
+lval* lval_cons(lval* v, lval* vs);
 
 lval* lval_read(ast_node* t);
 

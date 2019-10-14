@@ -9,6 +9,8 @@ char* ltype_name(enum ltype type) {
         case SE: return "S-expression";
         case Q: return "Q-expression";
         case FUN: return "Function";
+        case B: return "Bool";
+        case N: return "Nil";
         default: return "Unknown expression";
     }
 }
@@ -68,9 +70,11 @@ lval* newSY(char* s) {
     else if (strcmp(s, "eq") == 0) { v->v.sym = EQ; }
     // Parse some symbols to special forms
     else if (strcmp(s, "quote") == 0) { v->v.sym = SPECIAL_QUOTE; }
+    else if (strcmp(s, "'") == 0) { v->v.sym = SPECIAL_QUOTE; }
     else if (strcmp(s, "setq") == 0) { v->v.sym = SPECIAL_SETQ; }
     else if (strcmp(s, "lambda") == 0) { v->v.sym = SPECIAL_LAMBDA; }
     else if (strcmp(s, "cond") == 0) { v->v.sym = SPECIAL_COND; }
+    else if (strcmp(s, "cons") == 0) { v->v.sym = SPECIAL_CONS; }
     else { v->v.sym = CUSTOM; }
     return v;
 }
@@ -100,6 +104,19 @@ lval* newFUN(lbuiltin func) {
     return v;
 }
 
+lval* newB(bool b) {
+    lval* v = malloc(sizeof(lval));
+    v->v.b = b;
+    v->type = B;
+    return v;
+}
+
+lval* newN() {
+    lval* v = malloc(sizeof(lval));
+    v->type = N;
+    return v;
+}
+
 void lval_print(lval* v);
 void lval_println(lval* v) { lval_print(v); putchar('\n'); }
 
@@ -120,6 +137,8 @@ lval* newLambda(lval* params, lval* body) {
 void lval_del(lval* v) {
     switch (v->type) {
         case I:
+        case B:
+        case N:
         case F: break;
 
         case E: free(v->err); break;
@@ -152,10 +171,22 @@ lval* lval_add(lval* vs, lval* v) {
     return vs;
 }
 
+lval* lval_cons(lval* v, lval* vs) {
+    vs->count++;
+    vs->cell = realloc(vs->cell, sizeof(lval*) * vs->count);
+    for (int i = vs->count-1; i > 0; i--) {
+        vs->cell[i] = vs->cell[i-1];
+    }
+    vs->cell[0] = v;
+    return vs;
+}
+
 lval* lval_read(ast_node* t) {
     if (t->type == AST_REAL) { return newF(t->value.r); }
     if (t->type == AST_INT) { return newI(t->value.i); }
     if (t->type == AST_ATOM) { return newSY(t->value.a); }
+    if (t->type == AST_BOOL) { return newB(t->value.b); }
+    if (t->type == AST_NULL) { return newN(); }
     // TODO add support for the rest of types
 
     if (t->type == AST_LIST) {
@@ -177,6 +208,8 @@ void lval_print(lval* v) {
     switch (v->type) {
         case I: printf("%li", v->v.in); break;
         case F: printf("%lf", v->v.fn); break;
+        case B: printf("%s", v->v.b ? "true" : "false"); break;
+        case N: printf("nil"); break;
         case SY: printf("%s", v->sym); break;
         case SE: lval_expr_print(v, '(', ')'); break;
         case Q:  lval_expr_print(v, '{', '}'); break;
@@ -268,8 +301,6 @@ lval* lval_take(lval* vs, int i) {
      return v;
 }
 
-lval* lval_copy(lval* v);
-
 lval* lval_copy(lval* v) {
     lval* copy = malloc(sizeof(lval));
     copy->type = v->type;
@@ -277,6 +308,8 @@ lval* lval_copy(lval* v) {
     switch (v->type) {
         case F: copy->v.fn = v->v.fn; break;
         case I: copy->v.in = v->v.in; break;
+        case B: copy->v.b = v->v.b; break;
+        case N: break;
 
         case E:
             copy->err = malloc(strlen(v->err) + 1);

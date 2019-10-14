@@ -28,6 +28,7 @@ lval* lval_eval(lenv* env, lval* atom) {
             case SPECIAL_QUOTE:
             case SPECIAL_SETQ:
             case SPECIAL_LAMBDA:
+            case SPECIAL_CONS:
                 return atom;
             default:; // ; hack - https://stackoverflow.com/questions/18496282/why-do-i-get-a-label-can-only-be-part-of-a-statement-and-a-declaration-is-not-a
                 lval* v = lenv_get(env, atom);
@@ -184,6 +185,9 @@ lval* lval_eval_special_sexpr(lenv* env, lval* se) {
                 se->cell[0] = lval_eval(env, se->cell[0]);
             }
             return builtin_cond(env, se);
+        case SPECIAL_CONS:
+            lval_del(sf);
+            return builtin_cons(env, se);
 
         default: goto EXIT_EVAL_SPECIAL_SEXPR;
     }
