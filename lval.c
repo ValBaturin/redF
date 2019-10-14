@@ -75,6 +75,12 @@ lval* newSY(char* s) {
     else if (strcmp(s, "lambda") == 0) { v->v.sym = SPECIAL_LAMBDA; }
     else if (strcmp(s, "cond") == 0) { v->v.sym = SPECIAL_COND; }
     else if (strcmp(s, "cons") == 0) { v->v.sym = SPECIAL_CONS; }
+    else if (strcmp(s, "isInt") == 0) { v->v.sym = SPECIAL_ISINT; }
+    else if (strcmp(s, "isReal") == 0) { v->v.sym = SPECIAL_ISREAL; }
+    else if (strcmp(s, "isBool") == 0) { v->v.sym = SPECIAL_ISBOOL; }
+    else if (strcmp(s, "isNil") == 0) { v->v.sym = SPECIAL_ISNULL; }
+    else if (strcmp(s, "isAtom") == 0) { v->v.sym = SPECIAL_ISATOM; }
+    else if (strcmp(s, "isList") == 0) { v->v.sym = SPECIAL_ISLIST; }
     else { v->v.sym = CUSTOM; }
     return v;
 }

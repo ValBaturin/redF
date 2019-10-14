@@ -548,6 +548,35 @@ lval* builtin_cons(lenv* env, lval* v) {
     return ret;
 }
 
+lval* builtin_isint   (lenv* env, lval* v) { return builtin_is_type(env, v, I); }
+
+lval* builtin_isreal  (lenv* env, lval* v) { return builtin_is_type(env, v, F); }
+
+lval* builtin_isbool  (lenv* env, lval* v) { return builtin_is_type(env, v, B); }
+
+lval* builtin_isnull  (lenv* env, lval* v) { return builtin_is_type(env, v, N); }
+
+lval* builtin_isatom  (lenv* env, lval* v) { return builtin_is_type(env, v, SY); }
+
+lval* builtin_islist  (lenv* env, lval* v) { return builtin_is_type(env, v, SE); }
+
+lval* builtin_is_type(lenv* env, lval* v, enum ltype type) {
+    LASSERT(v, v->count == 1, ERR_BAD_OP,
+            "%s type check function passed wrong number of arg", ltype_name(type));
+
+    lval* val = lval_pop(v, 0);
+
+    switch (val->type) {
+        case I: lval_del(v); lval_del(val); return I == type ? newB(true) : newB(false);
+        case F: lval_del(v); lval_del(val); return F == type ? newB(true) : newB(false);
+        case B: lval_del(v); lval_del(val); return B == type ? newB(true) : newB(false);
+        case N: lval_del(v); lval_del(val); return N == type ? newB(true) : newB(false);
+        case SY: lval_del(v); lval_del(val); return SY == type ? newB(true) : newB(false);
+        case SE: lval_del(v); lval_del(val); return SE == type ? newB(true) : newB(false);
+        default: lval_del(v); lval_del(val); return newE(ERR_BAD_OP, "Couldn't get type");
+    }
+}
+
 void lenv_add_builtin(lenv* env, char* name, lbuiltin func) {
     lval* sym = newSY(name);
     lval* v   = newFUN(func);
