@@ -42,9 +42,9 @@ entity: real      {$$ = newRNode($1);}
 |       list
 entities: entity entities   {addNode(yycurrent, $1);}
 |         entity            {addNode(yycurrent, $1);}
-list: lbracket entities rbracket { 
-    $$ = yycurrent;
-    yycurrent = newLNode();
-    }
+list: lbracket entities rbracket {$$ = yycurrent;
+                                  yycurrent = newLNode();}
+|     lbracket rbracket          {$$ = yycurrent;
+                                  yycurrent = newLNode();}
 
 %%
