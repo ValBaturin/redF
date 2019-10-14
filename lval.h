@@ -53,6 +53,7 @@ enum stype {
     SPECIAL_SETQ,
     SPECIAL_LAMBDA,
     SPECIAL_COND,
+    SPECIAL_CONS,
 };
 
 struct lval {
@@ -108,6 +109,8 @@ lval* newLambda(lval* params, lval* body);
 void lval_del(lval* v);
 
 lval* lval_add(lval* vs, lval* v);
+
+lval* lval_cons(lval* v, lval* vs);
 
 lval* lval_read(ast_node* t);
 

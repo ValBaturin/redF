@@ -47,6 +47,8 @@ lval* builtin_ne(lenv* env, lval* vs);
 
 lval* builtin_cond(lenv* env, lval* vs);
 
+lval* builtin_cons(lenv* env, lval* vs);
+
 void lenv_add_builtin(lenv* env, char* name, lbuiltin func);
 
 void lenv_add_builtins(lenv* env);

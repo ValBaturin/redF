@@ -45,8 +45,7 @@ int main(int argc, char** argv) {
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
     // Print Version and Exit Informaton
-
-    puts("lis v0.13.0");
+    puts("lis v0.14.0");
     puts("Press ^C to Exit\n");
 
     lenv* env = new_lenv();

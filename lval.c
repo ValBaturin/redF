@@ -74,6 +74,7 @@ lval* newSY(char* s) {
     else if (strcmp(s, "setq") == 0) { v->v.sym = SPECIAL_SETQ; }
     else if (strcmp(s, "lambda") == 0) { v->v.sym = SPECIAL_LAMBDA; }
     else if (strcmp(s, "cond") == 0) { v->v.sym = SPECIAL_COND; }
+    else if (strcmp(s, "cons") == 0) { v->v.sym = SPECIAL_CONS; }
     else { v->v.sym = CUSTOM; }
     return v;
 }
@@ -167,6 +168,16 @@ lval* lval_add(lval* vs, lval* v) {
     vs->count++;
     vs->cell = realloc(vs->cell, sizeof(lval*) * vs->count);
     vs->cell[vs->count-1] = v;
+    return vs;
+}
+
+lval* lval_cons(lval* v, lval* vs) {
+    vs->count++;
+    vs->cell = realloc(vs->cell, sizeof(lval*) * vs->count);
+    for (int i = vs->count-1; i > 0; i--) {
+        vs->cell[i] = vs->cell[i-1];
+    }
+    vs->cell[0] = v;
     return vs;
 }
 

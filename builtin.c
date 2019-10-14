@@ -537,6 +537,16 @@ lval* builtin_cond(lenv* env, lval* v) {
 }
 
 
+lval* builtin_cons(lenv* env, lval* v) {
+    LASSERT(v, v->count == 2, ERR_BAD_OP,
+            "cons function passed wrong number of arg");
+    LASSERT(v, v->cell[1]->type == SE || v->cell[1]->type == Q, ERR_BAD_OP,
+            "cons function passed wrong arg type at pos 0");
+
+    lval* ret = lval_cons(v->cell[0], v->cell[1]);
+    //lval_del(v);
+    return ret;
+}
 
 void lenv_add_builtin(lenv* env, char* name, lbuiltin func) {
     lval* sym = newSY(name);
