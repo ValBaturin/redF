@@ -500,7 +500,6 @@ lval* builtin_ne(lenv* env, lval* v) {
 }
 
 lval* builtin_cond(lenv* env, lval* v) {
-    LASSERT_NUM("cond", v, 3);
     LASSERT(v, v->count == 2 || v->count == 3, ERR_BAD_OP,
             "cond function passed wrong number of arg");
     LASSERT_TYPE("cond", v, 0, B);

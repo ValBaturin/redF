@@ -112,7 +112,7 @@ lval* newB(bool b) {
 
 lval* newN() {
     lval* v = malloc(sizeof(lval));
-    v->type = B;
+    v->type = N;
     return v;
 }
 
