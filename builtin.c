@@ -444,12 +444,15 @@ lval* builtin_le(lenv* env, lval* v) {
     return builtin_ord(env, v, LE);
 }
 
-int lval_eq(lval* a, lval* b) {
+bool lval_eq(lval* a, lval* b) {
     if (a->type != b->type) { return 0; }
 
     switch (a->type) {
         case I: return (a->v.in == b->v.in);
         case F: return (a->v.fn == b->v.fn);
+
+        case B: return (a->v.b == b->v.b);
+        case N: return true;
 
         case E: return (strcmp(a->err, b->err) == 0);
         case SY: return (strcmp(a->sym, b->sym) == 0);
@@ -476,14 +479,14 @@ int lval_eq(lval* a, lval* b) {
 
 lval* builtin_cmp(lenv* env, lval* v, enum stype op) {
     LASSERT_NUM(op, v, 2);
-    int r;
+    bool b;
     switch (op) {
-        case EQ: r = lval_eq(v->cell[0], v->cell[1]); break;
-        case NE: r = !lval_eq(v->cell[0], v->cell[1]); break;
+        case EQ: b = lval_eq(v->cell[0], v->cell[1]); break;
+        case NE: b = !lval_eq(v->cell[0], v->cell[1]); break;
         default: lval_del(v); return newE(ERR_BAD_OP, "builtin_cmp fucked up");
     }
     lval_del(v);
-    return newI(r);
+    return newB(b);
 }
 
 lval* builtin_eq(lenv* env, lval* v) {
@@ -496,6 +499,8 @@ lval* builtin_ne(lenv* env, lval* v) {
 
 lval* builtin_cond(lenv* env, lval* v) {
     LASSERT_NUM("cond", v, 3);
+    LASSERT(v, v->count == 2 || v->count == 3, ERR_BAD_OP,
+            "cond function passed wrong number of arg");
     LASSERT_TYPE("cond", v, 0, I);
     LASSERT(v, v->cell[1]->type == SE || v->cell[0]->type == Q, ERR_BAD_OP,
             "cond function passed wrong argument type");
@@ -504,7 +509,9 @@ lval* builtin_cond(lenv* env, lval* v) {
 
     lval* ret;
     v->cell[1]->type = SE;
-    v->cell[2]->type = SE;
+    if (v->count == 3) {
+        v->cell[2]->type = SE;
+    }
 
     if (v->cell[0]->v.in) {
         ret = lval_eval(env, lval_pop(v, 1));

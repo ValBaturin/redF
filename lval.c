@@ -9,6 +9,8 @@ char* ltype_name(enum ltype type) {
         case SE: return "S-expression";
         case Q: return "Q-expression";
         case FUN: return "Function";
+        case B: return "Bool";
+        case N: return "Nil";
         default: return "Unknown expression";
     }
 }
@@ -100,6 +102,19 @@ lval* newFUN(lbuiltin func) {
     return v;
 }
 
+lval* newB(bool b) {
+    lval* v = malloc(sizeof(lval));
+    v->v.b = b;
+    v->type = B;
+    return v;
+}
+
+lval* newN() {
+    lval* v = malloc(sizeof(lval));
+    v->type = B;
+    return v;
+}
+
 void lval_print(lval* v);
 void lval_println(lval* v) { lval_print(v); putchar('\n'); }
 
@@ -156,6 +171,8 @@ lval* lval_read(ast_node* t) {
     if (t->type == AST_REAL) { return newF(t->value.r); }
     if (t->type == AST_INT) { return newI(t->value.i); }
     if (t->type == AST_ATOM) { return newSY(t->value.a); }
+    if (t->type == AST_BOOL) { return newB(t->value.b); }
+    if (t->type == AST_NULL) { return newN(); }
     // TODO add support for the rest of types
 
     if (t->type == AST_LIST) {
@@ -177,6 +194,8 @@ void lval_print(lval* v) {
     switch (v->type) {
         case I: printf("%li", v->v.in); break;
         case F: printf("%lf", v->v.fn); break;
+        case B: printf("%s", v->v.b ? "true" : "false"); break;
+        case N: printf("nil"); break;
         case SY: printf("%s", v->sym); break;
         case SE: lval_expr_print(v, '(', ')'); break;
         case Q:  lval_expr_print(v, '{', '}'); break;

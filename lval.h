@@ -24,7 +24,7 @@ enum ltype;
 // SE - S-expression
 // Q  - Q-expression
 // FUN - Function pointer
-enum ltype{I, F, E, SY, SE, Q, FUN};
+enum ltype{I, F, E, SY, SE, Q, FUN, N, B};
 
 // Symbol types
 enum stype {
@@ -62,6 +62,7 @@ struct lval {
         // Number values
         long int in;
         double fn;
+        bool b;
         // Err value
         enum etype err;
         // Symbol value
@@ -91,6 +92,10 @@ lval* newSY(char* s);
 lval* newSE();
 
 lval* newQ();
+
+lval* newB(bool b);
+
+lval* newN();
 
 lval* newFUN(lbuiltin func);
 
