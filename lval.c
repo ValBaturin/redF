@@ -136,6 +136,8 @@ lval* newLambda(lval* params, lval* body) {
 void lval_del(lval* v) {
     switch (v->type) {
         case I:
+        case B:
+        case N:
         case F: break;
 
         case E: free(v->err); break;
@@ -288,8 +290,6 @@ lval* lval_take(lval* vs, int i) {
      return v;
 }
 
-lval* lval_copy(lval* v);
-
 lval* lval_copy(lval* v) {
     lval* copy = malloc(sizeof(lval));
     copy->type = v->type;
@@ -297,6 +297,8 @@ lval* lval_copy(lval* v) {
     switch (v->type) {
         case F: copy->v.fn = v->v.fn; break;
         case I: copy->v.in = v->v.in; break;
+        case B: copy->v.b = v->v.b; break;
+        case N: break;
 
         case E:
             copy->err = malloc(strlen(v->err) + 1);

@@ -11,7 +11,7 @@
 int main(int argc, char** argv) {
 
     // Print Version and Exit Informaton
-    puts("lis v0.12.1");
+    puts("lis v0.13.0");
     puts("Press ^C to Exit\n");
 
     lenv* env = new_lenv();

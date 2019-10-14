@@ -5,12 +5,12 @@ lval* builtin_head(lenv* env, lval* vs) {
 
     LASSERT(vs, vs->count == 1,
         ERR_NOT_QEXPR, "Function 'head' passed too many arguments.");
-    LASSERT(vs, vs->cell[0]->type == Q,
+    LASSERT(vs, vs->cell[0]->type == Q || vs->cell[0]->type == SE,
         ERR_NOT_QEXPR, "Function 'head' passed incorrect type for argument 0. "
-                       "Got %s, Exprected %s.",
-                       ltype_name(vs->cell[0]->type), ltype_name(Q));
+                       "Got %s, Exprected %s or %s.",
+                       ltype_name(vs->cell[0]->type), ltype_name(Q), ltype_name(SE));
     LASSERT(vs, vs->cell[0]->count != 0,
-        ERR_NOT_QEXPR, "Function 'head' passed {}");
+        ERR_NOT_QEXPR, "Function 'head' passed {} (empty list)");
 
 
     lval* v = lval_take(vs, 0);
@@ -25,10 +25,12 @@ lval* builtin_tail(lenv* env, lval* vs) {
 
     LASSERT(vs, vs->count == 1,
         ERR_NOT_QEXPR, "Function 'tail' passed too many arguments.");
-    LASSERT(vs, vs->cell[0]->type == Q,
-        ERR_NOT_QEXPR, "Function 'tail' passed incorrect type.");
+    LASSERT(vs, vs->cell[0]->type == Q || vs->cell[0]->type == SE,
+        ERR_NOT_QEXPR, "Function 'tail' passed incorrect type for argument 0. "
+                       "Got %s, Exprected %s or %s.",
+                       ltype_name(vs->cell[0]->type), ltype_name(Q), ltype_name(SE));
     LASSERT(vs, vs->cell[0]->count != 0,
-        ERR_NOT_QEXPR, "Function 'tail' passed {}");
+        ERR_NOT_QEXPR, "Function 'tail' passed {} (empty list)");
 
     lval* v = lval_take(vs, 0);
     lval_println(v);
@@ -469,12 +471,12 @@ bool lval_eq(lval* a, lval* b) {
         case Q:
             if (a->count != b->count) { return 0; }
             for (int i = 0; i < a->count; i++) {
-                if (!lval_eq(a->cell[i], b->cell[i])) { return 0; }
+                if (!lval_eq(a->cell[i], b->cell[i])) { return false; }
             }
-            return 1;
+            return true;
         break;
     }
-    return 0;
+    return false;
 }
 
 lval* builtin_cmp(lenv* env, lval* v, enum stype op) {
@@ -501,22 +503,34 @@ lval* builtin_cond(lenv* env, lval* v) {
     LASSERT_NUM("cond", v, 3);
     LASSERT(v, v->count == 2 || v->count == 3, ERR_BAD_OP,
             "cond function passed wrong number of arg");
-    LASSERT_TYPE("cond", v, 0, I);
-    LASSERT(v, v->cell[1]->type == SE || v->cell[0]->type == Q, ERR_BAD_OP,
-            "cond function passed wrong argument type");
-    LASSERT(v, v->cell[2]->type == SE || v->cell[1]->type == Q, ERR_BAD_OP,
-            "cond function passed wrong argument type");
+    LASSERT_TYPE("cond", v, 0, B);
+// Any type should be fine starting from 0.13.0
+//
+//    LASSERT(v, v->cell[1]->type == SE || v->cell[0]->type == Q, ERR_BAD_OP,
+//            "cond function passed wrong argument type");
+//    LASSERT(v, v->cell[2]->type == SE || v->cell[1]->type == Q, ERR_BAD_OP,
+//            "cond function passed wrong argument type");
 
     lval* ret;
-    v->cell[1]->type = SE;
+
+    if (v->cell[1]->type == Q) {
+        v->cell[1]->type = SE;
+    };
+
     if (v->count == 3) {
-        v->cell[2]->type = SE;
+        if (v->cell[2]->type == Q) {
+            v->cell[2]->type = SE;
+        };
     }
 
-    if (v->cell[0]->v.in) {
+    if (v->cell[0]->v.b) {
         ret = lval_eval(env, lval_pop(v, 1));
     } else {
-        ret = lval_eval(env, lval_pop(v, 2));
+        if (v->count == 3) {
+            ret = lval_eval(env, lval_pop(v, 2));
+        } else {
+            ret = newN();
+        }
     }
 
     lval_del(v);
