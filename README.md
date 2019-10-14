@@ -1,57 +1,22 @@
 # ProjectF
-Functional Language
+![logo](redF.png)
 
-### Build
-`$ make`
+redF is an interpreter of lisp-like redf language.
+Read the [FAQ](https://github.com/CompilerBootCamp/ProjectF/wiki).
 
-### Run
-`$ ./fi`
+## Installation
 
-### Cleanup
-`$ make clean`
+### From Packages
 
-#### Current status
+redF is not yet available in any distributions. Try adding the "redF" package for
+yours. If it's available, you're either insane or lucky.
+
+If you're interested in packaging redF for your distribution for real, you'll be
+appreciated and honored. 
+
+### Compiling from Source
+
 ```
-𝒱 ./fi
-LNode 0x7fc0d8400620
-(true (12 12.0 (null) 100))
-BNode 0x7fc0d8402c20
-INode 0x7fc0d8402c40
-RNode 0x7fc0d8402c60
-NNode 0x7fc0d8402c80
-0x7fc0d8400620 <- 0x7fc0d8402c80 on 0
-LNode 0x7fc0d8402cb0
-INode 0x7fc0d8402cd0
-0x7fc0d8402cb0 <- 0x7fc0d8402cd0 on 0
-0x7fc0d8402cb0 <- 0x7fc0d8400620 on 1
-0x7fc0d8402cb0 <- 0x7fc0d8402c60 on 2
-0x7fc0d8402cb0 <- 0x7fc0d8402c40 on 3
-LNode 0x7fc0d8402d10
-0x7fc0d8402d10 <- 0x7fc0d8402cb0 on 0
-0x7fc0d8402d10 <- 0x7fc0d8402c20 on 1
-LNode 0x7fc0d8402d30
-printing 0x7fc0d8402d10
-type is 0
-it has 2 children:
-printing 0x7fc0d8402cb0
-type is 0
-it has 4 children:
-printing 0x7fc0d8402cd0
-type is 1
-it has 0 children:
-printing 0x7fc0d8400620
-type is 0
-it has 1 children:
-printing 0x7fc0d8402c80
-type is 1
-it has 0 children:
-printing 0x7fc0d8402c60
-type is 1
-it has 0 children:
-printing 0x7fc0d8402c40
-type is 1
-it has 0 children:
-printing 0x7fc0d8402c20
-type is 1
-it has 0 children:
-```
+$ git clone https://github.com/CompilerBootCamp/ProjectF
+$ cd ProjectF
+$ make
