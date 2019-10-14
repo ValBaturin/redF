@@ -70,6 +70,7 @@ lval* newSY(char* s) {
     else if (strcmp(s, "eq") == 0) { v->v.sym = EQ; }
     // Parse some symbols to special forms
     else if (strcmp(s, "quote") == 0) { v->v.sym = SPECIAL_QUOTE; }
+    else if (strcmp(s, "'") == 0) { v->v.sym = SPECIAL_QUOTE; }
     else if (strcmp(s, "setq") == 0) { v->v.sym = SPECIAL_SETQ; }
     else if (strcmp(s, "lambda") == 0) { v->v.sym = SPECIAL_LAMBDA; }
     else if (strcmp(s, "cond") == 0) { v->v.sym = SPECIAL_COND; }
