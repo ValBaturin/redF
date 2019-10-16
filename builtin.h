@@ -49,6 +49,20 @@ lval* builtin_cond(lenv* env, lval* vs);
 
 lval* builtin_cons(lenv* env, lval* vs);
 
+lval* builtin_isint (lenv* env, lval* v);
+
+lval* builtin_isreal  (lenv* env, lval* v);
+
+lval* builtin_isbool  (lenv* env, lval* v);
+
+lval* builtin_isnull  (lenv* env, lval* v);
+
+lval* builtin_isatom  (lenv* env, lval* v);
+
+lval* builtin_islist  (lenv* env, lval* v);
+
+lval* builtin_is_type(lenv* env, lval* v, enum ltype type);
+
 void lenv_add_builtin(lenv* env, char* name, lbuiltin func);
 
 void lenv_add_builtins(lenv* env);

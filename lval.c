@@ -75,6 +75,12 @@ lval* newSY(char* s) {
     else if (strcmp(s, "lambda") == 0) { v->v.sym = SPECIAL_LAMBDA; }
     else if (strcmp(s, "cond") == 0) { v->v.sym = SPECIAL_COND; }
     else if (strcmp(s, "cons") == 0) { v->v.sym = SPECIAL_CONS; }
+    else if (strcmp(s, "isInt") == 0) { v->v.sym = SPECIAL_ISINT; }
+    else if (strcmp(s, "isReal") == 0) { v->v.sym = SPECIAL_ISREAL; }
+    else if (strcmp(s, "isBool") == 0) { v->v.sym = SPECIAL_ISBOOL; }
+    else if (strcmp(s, "isNil") == 0) { v->v.sym = SPECIAL_ISNULL; }
+    else if (strcmp(s, "isAtom") == 0) { v->v.sym = SPECIAL_ISATOM; }
+    else if (strcmp(s, "isList") == 0) { v->v.sym = SPECIAL_ISLIST; }
     else { v->v.sym = CUSTOM; }
     return v;
 }
@@ -187,19 +193,27 @@ lval* lval_read(ast_node* t) {
     if (t->type == AST_ATOM) { return newSY(t->value.a); }
     if (t->type == AST_BOOL) { return newB(t->value.b); }
     if (t->type == AST_NULL) { return newN(); }
-    // TODO add support for the rest of types
+
+    lval* v = NULL;
+
+    if (t->type == AST_QLIST) {
+        if ((t->value.children.size == 1) &&
+            (t->value.children.nodes[0]->type == AST_LIST)) {
+            t->value.children.nodes[0]->type = AST_QLIST;
+            return lval_read(t->value.children.nodes[0]);
+        } else {
+            v = newQ();
+        }
+    }
 
     if (t->type == AST_LIST) {
-        lval* v = NULL;
         v = newSE();
-
-        for (int i = t->value.children.size - 1; i >= 0; --i) {
-            v = lval_add(v, lval_read(t->value.children.nodes[i]));
-        }
-
-        return v;
     }
-    return NULL;
+    for (int i = t->value.children.size - 1; i >= 0; --i) {
+        v = lval_add(v, lval_read(t->value.children.nodes[i]));
+    }
+
+    return v;
 }
 
 void lval_expr_print(lval* v, char open, char close);

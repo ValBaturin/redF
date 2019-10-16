@@ -12,8 +12,6 @@ void yyerror(char *s);
 
 typedef struct ast_node ast_node;
 
-ast_node* newLNode();
-
 enum asttype {
     AST_REAL,
     AST_BOOL,
@@ -21,6 +19,7 @@ enum asttype {
     AST_NULL,
     AST_ATOM,
     AST_LIST,
+    AST_QLIST,
 };
 
 struct ast_node
@@ -51,7 +50,9 @@ ast_node* newNNode();
 
 ast_node* newANode(char*);
 
-ast_node* newNode();
+ast_node* newLNode();
+
+ast_node* newQNode();
 
 void print(ast_node* n);
 

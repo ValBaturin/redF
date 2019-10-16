@@ -1,7 +1,12 @@
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+    largp = -largp
+endif
+
 all: fi fc
 
 fi: lex.yy.c grammar.tab.c
-	cc -Wall -g lex.yy.c grammar.tab.c ast.c lenv.c eval.c builtin.c lval.c loadlib.c fi.c -o fi -ledit -largp
+	cc -Wall -g lex.yy.c grammar.tab.c ast.c lenv.c eval.c builtin.c lval.c loadlib.c fi.c -o fi -ledit $(largp)
 
 fc: lex.yy.c grammar.tab.c
 	cc -g lex.yy.c grammar.tab.c ast.c lenv.c eval.c builtin.c lval.c fc.c -o fc 
