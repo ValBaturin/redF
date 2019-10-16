@@ -2,6 +2,7 @@
 ![logo](redF.png)
 
 redF is an interpreter of lisp-like redf language.
+[Live demo](http://projectf.alexryndin.me/).
 Read the [FAQ](https://github.com/CompilerBootCamp/ProjectF/wiki).
 
 ## Installation
