@@ -193,19 +193,18 @@ lval* lval_read(ast_node* t) {
     if (t->type == AST_ATOM) { return newSY(t->value.a); }
     if (t->type == AST_BOOL) { return newB(t->value.b); }
     if (t->type == AST_NULL) { return newN(); }
-    // TODO add support for the rest of types
 
+    lval* v = NULL;
     if (t->type == AST_LIST) {
-        lval* v = NULL;
         v = newSE();
-
-        for (int i = t->value.children.size - 1; i >= 0; --i) {
-            v = lval_add(v, lval_read(t->value.children.nodes[i]));
-        }
-
-        return v;
     }
-    return NULL;
+    if (t->type == AST_QLIST) {
+        v = newQ();
+    }
+    for (int i = t->value.children.size - 1; i >= 0; --i) {
+        v = lval_add(v, lval_read(t->value.children.nodes[i]));
+    }
+    return v;
 }
 
 void lval_expr_print(lval* v, char open, char close);
