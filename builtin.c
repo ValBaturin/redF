@@ -128,13 +128,13 @@ lval* builtin_lambda(lenv* env, lval* v) {
     LASSERT(v, v->cell[0]->type == SE || v->cell[0]->type == Q, ERR_BAD_OP,
             "Lambda function passed wrong argument type"
             "Got %s, Expected %s.",
-            ltype_name(v->type),
-            ltype_name(SY));
-    LASSERT(v, v->cell[1]->type == SE, ERR_BAD_OP,
+            ltype_name(v->cell[0]->type),
+            ltype_name(SE));
+    LASSERT(v, v->cell[1]->type == SE || v->cell[1]->type == Q, ERR_BAD_OP,
             "Lambda function passed wrong argument type"
             "Got %s, Expected %s.",
-            ltype_name(v->type),
-            ltype_name(SY));
+            ltype_name(v->cell[1]->type),
+            ltype_name(SE));
 
     for (int i = 0; i < v->cell[0]->count; i++) {
         LASSERT(v, (v->cell[0]->cell[i]->type == SY), ERR_BAD_OP,
