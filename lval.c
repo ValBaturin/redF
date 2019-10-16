@@ -195,15 +195,24 @@ lval* lval_read(ast_node* t) {
     if (t->type == AST_NULL) { return newN(); }
 
     lval* v = NULL;
+
+    if (t->type == AST_QLIST) {
+        if ((t->value.children.size == 1) &&
+            (t->value.children.nodes[0]->type == AST_LIST)) {
+            t->value.children.nodes[0]->type = AST_QLIST;
+            return lval_read(t->value.children.nodes[0]);
+        } else {
+            v = newQ();
+        }
+    }
+
     if (t->type == AST_LIST) {
         v = newSE();
-    }
-    if (t->type == AST_QLIST) {
-        v = newQ();
     }
     for (int i = t->value.children.size - 1; i >= 0; --i) {
         v = lval_add(v, lval_read(t->value.children.nodes[i]));
     }
+
     return v;
 }
 

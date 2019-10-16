@@ -33,7 +33,6 @@ lval* builtin_tail(lenv* env, lval* vs) {
         ERR_NOT_QEXPR, "Function 'tail' passed {} (empty list)");
 
     lval* v = lval_take(vs, 0);
-    lval_println(v);
     lval_del(lval_pop(v, 0));
     return v;
 }
