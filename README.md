@@ -1,5 +1,5 @@
 # ProjectF
-![logo](redF.png)
+![logo](./static/redF.png)
 
 redF is an interpreter of lisp-like redf language.
 
